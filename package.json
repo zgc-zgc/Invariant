@@ -1,0 +1,42 @@
+{
+  "name": "invariantx",
+  "version": "1.0.0",
+  "description": "智能合约Invariant和Rule自动发现系统",
+  "main": "dist/index.js",
+  "bin": {
+    "invariantx": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "solidity",
+    "smart-contracts",
+    "invariant",
+    "rules",
+    "ai",
+    "analysis"
+  ],
+  "author": "InvariantX Team",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "jest": "^29.7.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.0"
+  }
+}

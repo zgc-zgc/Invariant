@@ -1,0 +1,17 @@
+{
+  "projectName": "InvariantX示例项目分析",
+  "description": "演示批量分析功能的示例配置",
+  "materials": [
+    {
+      "id": "001",
+      "type": "contract",
+      "name": "示例代币合约",
+      "path": "./examples/SimpleToken.sol",
+      "priority": "high",
+      "completed": false
+    }
+  ],
+  "outputPath": "./results/batch-analysis-results.json",
+  "resumeFrom": "001",
+  "lastUpdated": "2025-07-29T12:48:35.538Z"
+}
