@@ -194,7 +194,7 @@ CHALLENGE ALPHA'S INVARIANT/RULE DISCOVERY, NOT THEIR SECURITY AWARENESS.`;
     
     this.logger.debug(`向 ${agentType} Beta 发送API请求...`);
 
-    const fullPrompt = `${systemPrompt}\n\n${challengePrompt}${antiSecuritySuffix}`;
+    const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${challengePrompt}${antiSecuritySuffix}`;
     const response = await this.apiManager.callAPI(fullPrompt);
     
     this.logger.debug(`${agentType} Beta API调用完成`);
