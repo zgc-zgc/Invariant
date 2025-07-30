@@ -50,14 +50,7 @@ export class ProgressDisplay {
     newDiscoveries: number,
     convergenceScore: number
   ): void {
-    const roundProgress = Math.round((round / maxRounds) * 100);
-    
-    console.log(`
-┌─────────────── ${agentType} Challenge Progress ───────────────┐
-│ Round: ${round}/${maxRounds} ${this.renderBar(roundProgress, 30)}         │
-│ New Discoveries: ${newDiscoveries} | Convergence: ${(convergenceScore * 100).toFixed(1)}%     │
-└──────────────────────────────────────────────────────┘
-`);
+    // Visualization disabled by user.
   }
 
   public showBatchProgress(
@@ -108,14 +101,7 @@ export class ProgressDisplay {
     keyTermSimilarity: number,
     overallScore: number
   ): void {
-    console.log(`
-┌─────────────── Convergence Analysis ─────────────────┐
-│ Length Ratio:     ${this.renderMiniBar(lengthRatio)} ${(lengthRatio * 100).toFixed(1)}%     │
-│ Word Overlap:     ${this.renderMiniBar(wordOverlap)} ${(wordOverlap * 100).toFixed(1)}%     │
-│ Key Terms:        ${this.renderMiniBar(keyTermSimilarity)} ${(keyTermSimilarity * 100).toFixed(1)}%     │
-│ Overall Score:    ${this.renderMiniBar(overallScore)} ${(overallScore * 100).toFixed(1)}%     │
-└──────────────────────────────────────────────────────┘
-`);
+    // Visualization disabled by user.
   }
 
   private renderMiniBar(value: number, width: number = 15): string {
