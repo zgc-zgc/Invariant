@@ -2,11 +2,13 @@ import { InvariantDiscoveryOrchestrator } from './InvariantDiscoveryOrchestrator
 import { ProgressManager, MaterialItem } from './ProgressManager';
 import { MaterialReader, MaterialContent } from './MaterialReader';
 import { DiscoveryResult } from '../types';
+import { createLogger } from '../utils/Logger';
 
 export class BatchAnalysisOrchestrator {
   private progressManager: ProgressManager;
   private materialReader: MaterialReader;
   private discoveryOrchestrator: InvariantDiscoveryOrchestrator;
+  private logger = createLogger('BatchOrchestrator');
 
   constructor(configPath: string) {
     this.progressManager = new ProgressManager(configPath);
@@ -15,23 +17,23 @@ export class BatchAnalysisOrchestrator {
   }
 
   public async analyzeBatch(): Promise<void> {
-    console.log('开始批量分析流程...');
+    this.logger.info('🚀 启动批量分析流程');
     
     // 验证所有材料路径
     const materials = this.progressManager.getAllMaterials();
     const validationErrors = MaterialReader.validateMaterialPaths(materials);
     if (validationErrors.length > 0) {
-      console.error('路径验证失败:');
-      validationErrors.forEach(error => console.error(`  - ${error}`));
+      this.logger.error('❌ 路径验证失败:');
+      validationErrors.forEach(error => this.logger.error(`  - ${error}`));
       throw new Error('配置文件中存在无效路径');
     }
 
     // 显示进度信息
     const progress = this.progressManager.getProgress();
-    console.log(`总材料数: ${progress.total}, 已完成: ${progress.completed} (${progress.percentage}%)`);
+    this.logger.info(`📊 材料总数: ${progress.total}, 已完成: ${progress.completed} (${progress.percentage}%)`);
 
     if (this.progressManager.isCompleted()) {
-      console.log('所有材料已分析完成！');
+      this.logger.info('✅ 所有材料已分析完成!');
       this.progressManager.saveAggregatedResults();
       this.progressManager.cleanup();
       return;
@@ -43,23 +45,23 @@ export class BatchAnalysisOrchestrator {
       try {
         await this.analyzeSingleMaterial(material);
       } catch (error) {
-        console.error(`分析材料 ${material.id} (${material.name}) 时出错:`, error);
+        this.logger.error(`❌ 分析材料 ${material.id} (${material.name}) 时出错: ${error}`);
         
         // 询问是否继续或跳过
-        console.log('选择: 1) 跳过此材料继续 2) 停止分析');
+        this.logger.info('选择: 1) 跳过此材料继续 2) 停止分析');
         // 这里可以添加用户输入处理，暂时默认跳过
-        console.log('跳过此材料，继续下一个...');
+        this.logger.warn('⚠️ 跳过此材料，继续下一个');
         continue;
       }
     }
 
-    console.log('批量分析完成！');
+    this.logger.info('🎉 批量分析全部完成!');
     this.progressManager.saveAggregatedResults();
     this.progressManager.cleanup();
   }
 
   private async analyzeSingleMaterial(material: MaterialItem): Promise<void> {
-    console.log(`\n=== 开始分析材料 ${material.id}: ${material.name} ===`);
+    this.logger.info(`\n=== 📋 开始分析材料 ${material.id}: ${material.name} ===`);
     
     this.progressManager.markMaterialStarted(material.id);
 
@@ -67,17 +69,17 @@ export class BatchAnalysisOrchestrator {
     const contents: MaterialContent[] = await this.materialReader.readMaterial(material);
     
     if (contents.length === 0) {
-      console.warn(`材料 ${material.id} 没有可读取的内容`);
+      this.logger.warn(`⚠️ 材料 ${material.id} 没有可读取的内容`);
       return;
     }
 
-    console.log(`材料包含 ${contents.length} 个文件/内容`);
+    this.logger.info(`📁 材料包含 ${contents.length} 个文件/内容`);
 
     // 为每个内容进行分析
     const allResults: DiscoveryResult[] = [];
     
     for (const content of contents) {
-      console.log(`  分析内容: ${content.name} (${content.type})`);
+      this.logger.info(`  🔍 分析内容: ${content.name} (${content.type})`);
       
       try {
         // 所有内容类型都使用相同的分析路径
@@ -87,10 +89,10 @@ export class BatchAnalysisOrchestrator {
         result.contract = `${material.name} - ${content.name} (${content.type})`;
         allResults.push(result);
         
-        console.log(`    发现 ${result.discoveredInvariants?.length || 0} 个不变量`);
+        this.logger.info(`    ✅ 发现 ${result.discoveredInvariants?.length || 0} 个不变量`);
         
       } catch (error) {
-        console.error(`    分析内容 ${content.name} 时出错:`, error);
+        this.logger.error(`    ❌ 分析内容 ${content.name} 时出错: ${error}`);
       }
     }
 
@@ -99,7 +101,7 @@ export class BatchAnalysisOrchestrator {
     
     this.progressManager.markMaterialCompleted(material.id, aggregatedResult);
     
-    console.log(`=== 完成材料 ${material.id} 分析，发现 ${aggregatedResult.discoveredInvariants?.length || 0} 个不变量 ===\n`);
+    this.logger.info(`=== 🎯 完成材料 ${material.id} 分析，发现 ${aggregatedResult.discoveredInvariants?.length || 0} 个不变量 ===\n`);
   }
 
 
@@ -129,7 +131,7 @@ export class BatchAnalysisOrchestrator {
   }
 
   public async resumeAnalysis(): Promise<void> {
-    console.log('恢复中断的分析...');
+    this.logger.info('恢复中断的分析...');
     await this.analyzeBatch();
   }
 }

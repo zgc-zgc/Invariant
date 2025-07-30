@@ -1,4 +1,5 @@
 import { APIConfig } from '../types';
+import { aiLogger } from '../utils/AICommunicationLogger';
 
 export class APIManager {
   private config: APIConfig;
@@ -7,13 +8,13 @@ export class APIManager {
     this.config = config;
   }
   
-  async callAPI(prompt: string): Promise<string> {
+  async callAPI(prompt: string, agent?: string): Promise<string> {
     const { retryConfig } = this.config;
     let lastError: Error | null = null;
     
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
       try {
-        const response = await this.makeAPICall(prompt);
+        const response = await this.makeAPICall(prompt, agent);
         return response;
       } catch (error) {
         lastError = error as Error;
@@ -41,8 +42,16 @@ export class APIManager {
     throw new Error(`API call failed after ${retryConfig.maxRetries} retries: ${lastError?.message}`);
   }
   
-  private async makeAPICall(prompt: string): Promise<string> {
+  private async makeAPICall(prompt: string, agent?: string): Promise<string> {
     const requestBody = this.buildRequestBody(prompt);
+    
+    // 记录发送的提示词
+    aiLogger.logPrompt(agent || 'Unknown', prompt, {
+      model: this.config.model,
+      endpoint: this.config.endpoint
+    });
+    
+    const startTime = Date.now();
     
     const response = await fetch(this.config.endpoint, {
       method: 'POST',
@@ -55,11 +64,25 @@ export class APIManager {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const error = `HTTP ${response.status}: ${response.statusText}`;
+      aiLogger.logSystem(`API调用失败: ${error}`, {
+        status: response.status,
+        statusText: response.statusText
+      });
+      throw new Error(error);
     }
     
     const data = await response.json();
-    return this.extractResponseContent(data);
+    const responseContent = this.extractResponseContent(data);
+    const duration = Date.now() - startTime;
+    
+    // 记录AI的响应
+    aiLogger.logResponse(agent || 'Unknown', responseContent, duration, {
+      model: this.config.model,
+      responseLength: responseContent.length
+    });
+    
+    return responseContent;
   }
   
   private buildRequestBody(prompt: string): Record<string, any> {

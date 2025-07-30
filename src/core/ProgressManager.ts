@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DiscoveryResult, Invariant } from '../types';
+import { createLogger } from '../utils/Logger';
 
 export interface MaterialItem {
   id: string;
@@ -33,6 +34,7 @@ export class ProgressManager {
   private stateFilePath: string;
   private config: MaterialsConfig;
   private state: AnalysisState;
+  private logger = createLogger('ProgressManager');
 
   constructor(configPath: string) {
     this.stateFilePath = configPath.replace('.json', '.state.json');
@@ -51,7 +53,7 @@ export class ProgressManager {
 
   private loadOrCreateState(configPath: string): AnalysisState {
     if (fs.existsSync(this.stateFilePath)) {
-      console.log('发现已有进度文件，将从中断处继续...');
+      this.logger.info('发现已有进度文件，将从中断处继续...');
       const stateData = fs.readFileSync(this.stateFilePath, 'utf-8');
       return JSON.parse(stateData);
     }
@@ -105,7 +107,7 @@ export class ProgressManager {
 
   public markMaterialStarted(materialId: string): void {
     this.state.currentMaterialId = materialId;
-    console.log(`开始分析材料 ${materialId}`);
+    this.logger.info(`开始分析材料 ${materialId}`);
     this.saveState();
   }
 
@@ -115,7 +117,7 @@ export class ProgressManager {
     }
     
     this.state.aggregatedResults.push(result);
-    console.log(`完成材料 ${materialId} 的分析`);
+    this.logger.info(`完成材料 ${materialId} 的分析`);
     
     this.saveState();
   }
@@ -142,30 +144,11 @@ export class ProgressManager {
         materialType: this.config.materials[index]?.type || 'unknown',
         analysisResult: result
       })),
-      aggregatedInvariants: this.aggregateInvariants(),
       summary: this.generateSummary()
     };
 
     fs.writeFileSync(outputPath, JSON.stringify(aggregatedReport, null, 2));
-    console.log(`聚合结果已保存到: ${outputPath}`);
-  }
-
-  private aggregateInvariants(): Invariant[] {
-    const allInvariants: Invariant[] = [];
-    const seenDescriptions = new Set<string>();
-
-    for (const result of this.state.aggregatedResults) {
-      for (const invariant of result.discoveredInvariants || []) {
-        // 去重：基于描述的相似性
-        if (!seenDescriptions.has(invariant.description)) {
-          allInvariants.push(invariant);
-          seenDescriptions.add(invariant.description);
-        }
-      }
-    }
-
-    // 返回不变量列表（移除排序逻辑）
-    return allInvariants;
+    this.logger.info(`聚合结果已保存到: ${outputPath}`);
   }
 
   private generateSummary(): any {
@@ -201,7 +184,7 @@ export class ProgressManager {
     // 分析完成后清理状态文件
     if (fs.existsSync(this.stateFilePath)) {
       fs.unlinkSync(this.stateFilePath);
-      console.log('清理状态文件');
+      this.logger.info('清理状态文件');
     }
   }
 }

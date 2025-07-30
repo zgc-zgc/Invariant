@@ -5,11 +5,13 @@ import { ExplorerAgent } from '../agents/ExplorerAgent';
 import { DeepenerAgent } from '../agents/DeepenerAgent';
 import { SynthesizerAgent } from '../agents/SynthesizerAgent';
 import { SharedContext, AgentMessage, DiscoveryResult, ExplorationTask, Invariant } from '../types';
+import { createLogger, Logger } from '../utils/Logger';
 
 export class InvariantDiscoveryOrchestrator {
   private configManager: ConfigManager;
   private apiManager: APIManager;
   private configLoader: DynamicConfigLoader;
+  private logger = createLogger('Orchestrator');
   
   // AI Agents
   private explorer: ExplorerAgent;
@@ -32,13 +34,11 @@ export class InvariantDiscoveryOrchestrator {
     configPath?: string
   ): Promise<DiscoveryResult> {
     const startTime = Date.now();
-    console.log('\n' + '='.repeat(80));
-    console.log('🚀 开始InvariantX智能合约不变量发现流程');
-    console.log('='.repeat(80));
-    console.log(`📅 开始时间: ${new Date().toLocaleString()}`);
-    console.log(`📄 合约代码长度: ${contractCode.length} 字符`);
-    console.log(`⚙️  配置文件路径: ${configPath || '使用默认配置'}`);
-    console.log('='.repeat(80) + '\n');
+    const mainLogger = Logger.getInstance();
+    
+    mainLogger.phase('开始不变量发现流程');
+    this.logger.debug(`合约代码长度: ${contractCode.length} 字符`);
+    this.logger.debug(`配置文件路径: ${configPath || '使用默认配置'}`);
     
     // 初始化共享上下文
     const context: SharedContext = {
@@ -50,46 +50,33 @@ export class InvariantDiscoveryOrchestrator {
       currentRound: 1
     };
     
-    console.log('📋 初始化共享上下文完成');
+    this.logger.info('正在初始化分析环境');
     
     // 加载配置
-    console.log('⚙️  正在加载探索任务配置...');
+    this.logger.info('正在加载探索策略配置');
     const explorationTasks = await this.loadExplorationTasks(configPath);
-    console.log(`✅ 加载完成，共 ${explorationTasks.length} 个探索任务`);
+    this.logger.info(`成功加载 ${explorationTasks.length} 个探索维度`);
     
     try {
       // 第一阶段：Explorer Challenge探索
-      console.log('\n' + '━'.repeat(60));
-      console.log('🔍 第一阶段：Explorer Alpha-Beta Challenge探索');
-      console.log('━'.repeat(60));
-      console.log('🎯 目标：通过Alpha-Beta挑战机制全面发现合约不变量');
-      console.log(`📊 探索任务数量: ${explorationTasks.length}`);
-      
+      mainLogger.phase('阶段 1: Explorer 探索');
       const explorerMessages = await this.explorerChallengePhase(contractCode, explorationTasks, context);
-      
-      console.log('\n✅ Explorer挑战阶段完成');
-      console.log(`📈 生成消息数量: ${explorerMessages.length}`);
+      this.logger.info(`Explorer 探索完成，产生 ${explorerMessages.length} 项发现`);
       
       // 识别核心不变量
-      console.log('\n' + '━'.repeat(60));
-      console.log('🎯 核心不变量识别阶段');
-      console.log('━'.repeat(60));
-      console.log('🔬 正在从Explorer发现中提取最关键的不变量...');
-      
+      mainLogger.phase('核心不变量识别');
       const coreInvariants = await this.synthesizer.identifyCore(explorerMessages);
-      
-      console.log(`\n✅ 核心不变量识别完成`);
-      console.log(`💎 识别出 ${coreInvariants.length} 个核心不变量`);
+      this.logger.info(`成功识别 ${coreInvariants.length} 个核心不变量`);
       coreInvariants.forEach((invariant, index) => {
-        console.log(`   ${index + 1}. ${invariant.description.substring(0, 80)}...`);
+        this.logger.debug(`   ${index + 1}. ${invariant.description.substring(0, 80)}`);
       });
       
       // 第二阶段：Deepener Challenge深化分析
-      console.log('第二阶段：Deepener Alpha-Beta Challenge深化分析');
+      mainLogger.phase('阶段 2: Deepener 深化');
       const deepenerMessages = await this.deepenerChallengePhase(coreInvariants, explorerMessages, contractCode);
       
       // 第三阶段：最终综合
-      console.log('第三阶段：最终综合');
+      mainLogger.phase('阶段 3: 最终综合');
       const finalResult = await this.synthesizer.finalSynthesize({
         initial: explorerMessages,
         deepened: deepenerMessages,
@@ -99,24 +86,18 @@ export class InvariantDiscoveryOrchestrator {
       const executionTime = Date.now() - startTime;
       
       // 成功完成
-      console.log('\n' + '='.repeat(80));
-      console.log('🎆 InvariantX不变量发现流程成功完成!');
-      console.log('='.repeat(80));
-      console.log(`⏱️  总执行时间: ${executionTime} ms (${(executionTime / 1000).toFixed(2)} 秒)`);
-      console.log(`📊 最终不变量数量: ${finalResult.discoveredInvariants?.length || 0}`);
-      console.log(`📦 返回结果大小: ${JSON.stringify(finalResult).length} 字符`);
-      console.log('='.repeat(80) + '\n');
+      mainLogger.phase('分析流程完成');
+      this.logger.info(`🎉 分析完成! 总耗时: ${(executionTime / 1000).toFixed(2)} 秒`);
+      this.logger.info(`📊 发现不变量数量: ${finalResult.discoveredInvariants?.length || 0} 个`);
+      mainLogger.separator();
       
       return finalResult;
       
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      console.error('\n' + '❌'.repeat(20));
-      console.error('⚠️  InvariantX发现流程出错!');
-      console.error('❌'.repeat(60));
-      console.error(`⏱️  失败时间: ${executionTime}ms`);
-      console.error(`🔍 错误信息: ${error}`);
-      console.error('❌'.repeat(60));
+      mainLogger.phase('流程出错');
+      this.logger.error(`错误: ${error}`);
+      mainLogger.separator();
       throw error;
     }
   }
@@ -126,8 +107,7 @@ export class InvariantDiscoveryOrchestrator {
     explorationTasks: ExplorationTask[],
     context: SharedContext
   ): Promise<AgentMessage[]> {
-    console.log('\n🔍 Explorer Alpha-Beta Challenge开始...');
-    console.log(`📊 探索任务数量: ${explorationTasks.length}`);
+    this.logger.info('🚀 启动 Explorer 对抗探索');
     
     // 使用新的Challenge方法
     const startTime = Date.now();
@@ -136,9 +116,7 @@ export class InvariantDiscoveryOrchestrator {
     
     context.discussionHistory.push(...explorerMessages);
     
-    console.log(`\n✅ Explorer Challenge完成`);
-    console.log(`⏱️  耗时: ${endTime - startTime}ms`);
-    console.log(`💡 发现了 ${explorerMessages.length} 个潜在不变量`);
+    this.logger.info(`✅ Explorer 对抗探索完成 (耗时: ${((endTime - startTime) / 1000).toFixed(1)}s)`);
     
     return explorerMessages;
   }
@@ -148,7 +126,7 @@ export class InvariantDiscoveryOrchestrator {
     originalFindings: AgentMessage[],
     contractCode: string
   ): Promise<AgentMessage[]> {
-    console.log('Deepener 开始Alpha-Beta Challenge深化分析...');
+    this.logger.info('🔍 启动 Deepener 深化分析');
     
     // 使用新的Challenge方法
     const deepenerMessages = await this.deepener.deepenWithChallenge(
@@ -157,7 +135,7 @@ export class InvariantDiscoveryOrchestrator {
       contractCode
     );
     
-    console.log(`Deepener Challenge完成，完成了 ${deepenerMessages.length} 个深化分析`);
+    this.logger.info(`✅ Deepener 深度分析完成，生成 ${deepenerMessages.length} 项深化发现`);
     
     return deepenerMessages;
   }
@@ -174,11 +152,11 @@ export class InvariantDiscoveryOrchestrator {
       };
       
       const tasks = await configLoader.generateExplorationTasks(contractInfo);
-      console.log(`加载了 ${tasks.length} 个探索任务类别`);
+      this.logger.debug(`成功加载 ${tasks.length} 个探索任务类别`);
       return tasks;
       
     } catch (error) {
-      console.warn('配置加载失败，使用默认探索模式:', error);
+      this.logger.warn(`⚠️ 配置加载失败，使用默认探索模式: ${error}`);
       return [
         {
           category: 'general',

@@ -2,11 +2,13 @@ import { APIManager } from '../api/APIManager';
 import { AgentMessage, ChallengeRound, ChallengeResult, ConvergenceConfig } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { ProgressDisplay } from '../utils/ProgressDisplay';
+import { createLogger } from '../utils/Logger';
 
 export class ChallengeSystem {
   private apiManager: APIManager;
   private convergenceConfig: ConvergenceConfig;
   private progressDisplay: ProgressDisplay;
+  private logger = createLogger('ChallengeSystem');
 
   constructor(apiManager: APIManager, convergenceConfig: ConvergenceConfig) {
     this.apiManager = apiManager;
@@ -21,42 +23,42 @@ export class ChallengeSystem {
     supplementaryPrompts: string[] = []
   ): Promise<ChallengeResult> {
     
-    console.log(`\n🔥 开始 ${agentType} ...`);
-    console.log(`📋 补充提示数量: ${supplementaryPrompts.length}`);
+    this.logger.info(`🎯 启动 ${agentType} 对抗分析模式`);
     
     const rounds: ChallengeRound[] = [];
     let previousDiscoveries = new Set<string>();
     
     // 第一轮：Alpha开始
-    console.log(`\n📨 [轮次 0] 发送初始prompt给 ${agentType} Alpha:`);
-    console.log(`📋 提示词预览: ${initialPrompt.substring(0, 200)}...`);
-    
-    // 初始化Alpha消息
+    this.logger.info(`[轮次 0] ${agentType} Alpha 开始深度探索`);
     let alphaMessage = await this.callAlphaRole(agentType, initialPrompt, contractCode, supplementaryPrompts);
-    console.log(`\n📥 [轮次 0] ${agentType} Alpha 初始响应预览: ${alphaMessage.content.description.substring(0, 200)}...`);
+    this.logger.info(`[轮次 0] ${agentType} Alpha 完成初始发现`);
     
     for (let roundNum = 1; roundNum <= this.convergenceConfig.maxChallengeRounds; roundNum++) {
-      console.log(`\n🔄 第 ${roundNum} 轮 Challenge 开始`);
+      this.logger.info(`🔄 第 ${roundNum} 轮对抗开始`);
       
       // Beta 挑战 Alpha
-      console.log(`\n🎯 [轮次 ${roundNum}] Beta 开始挑战 Alpha:`);
-      console.log(`📤 Beta 正在分析Alpha的发现并生成挑战...`);
+      this.logger.info(`[轮次 ${roundNum}] ${agentType} Beta 发起挑战质疑`);
       const betaMessage = await this.callBetaRole(agentType, alphaMessage, contractCode, supplementaryPrompts);
-      
-      console.log(`\n📥 [轮次 ${roundNum}] Beta 挑战响应预览:${betaMessage.content.description.substring(0, 200)}...`);
+      this.logger.info(`[轮次 ${roundNum}] ${agentType} Beta 完成挑战分析`);
       
       // Alpha 回应 Beta
-      console.log(`\n🔥 [Round ${roundNum}] Alpha 回应 Beta 挑战:`);
-      console.log(`📤 Alpha 正在处理挑战并生成回应...`);
+      this.logger.info(`[轮次 ${roundNum}] ${agentType} Alpha 回应并补强论证`);
       alphaMessage = await this.callAlphaRole(agentType, this.buildChallengePrompt(alphaMessage, betaMessage), contractCode, supplementaryPrompts);
-      
-      console.log(`\n📥 [Round ${roundNum}] Alpha 挑战回应预览:${alphaMessage.content.description.substring(0, 200)}...`);
+      this.logger.info(`[轮次 ${roundNum}] ${agentType} Alpha 完成回应强化`);
       
       // 计算新发现数量
       const beforeCount = previousDiscoveries.size;
-      this.updateDiscoverySet(alphaMessage, previousDiscoveries);
-      this.updateDiscoverySet(betaMessage, previousDiscoveries);
-      const newDiscoveries = previousDiscoveries.size - beforeCount;
+      
+      // 创建临时集合来跟踪本轮的新发现
+      const tempDiscoveries = new Set(previousDiscoveries);
+      this.updateDiscoverySet(alphaMessage, tempDiscoveries);
+      this.updateDiscoverySet(betaMessage, tempDiscoveries);
+      
+      const newDiscoveries = tempDiscoveries.size - beforeCount;
+      
+      // 更新主发现集合
+      previousDiscoveries.clear();
+      tempDiscoveries.forEach(discovery => previousDiscoveries.add(discovery));
       
       // 计算收敛分数
       const convergenceScore = this.calculateConvergenceScore(alphaMessage, betaMessage);
@@ -80,20 +82,12 @@ export class ChallengeSystem {
         convergenceScore
       );
       
-      console.log(`\n📊 [Round ${roundNum}] 轮次统计:`);
-      console.log(`   💡 新发现数量: ${newDiscoveries}`);
-      console.log(`   📈 收敛分数: ${convergenceScore.toFixed(3)}`);
-      console.log(`   🧮 累计发现: ${previousDiscoveries.size}`);
+      this.logger.debug(`[Round ${roundNum}] 轮次统计: 新发现=${newDiscoveries}, 收敛分数=${convergenceScore.toFixed(3)}, 累计=${previousDiscoveries.size}`);
       
       // 检查收敛条件
       if (this.shouldConverge(round, rounds)) {
         const reason = this.getConvergenceReason(round, rounds, roundNum);
-        console.log(`\n🎯 Challenge收敛条件达成!`);
-        console.log(`${'━'.repeat(50)}`);
-        console.log(`🏆 收敛原因: ${reason}`);
-        console.log(`⏱️  总轮数: ${roundNum}`);
-        console.log(`📋 最终发现数量: ${previousDiscoveries.size}`);
-        console.log(`${'━'.repeat(50)}`);
+        this.logger.info(`✅ 对抗分析达成共识! 收敛原因: ${reason}, 总轮数: ${roundNum}`);
         
         return {
           totalRounds: roundNum,
@@ -104,12 +98,7 @@ export class ChallengeSystem {
       }
     }
     
-    console.log(`\n⚠️  Challenge达到最大轮数限制!`);
-    console.log(`${'━'.repeat(50)}`);
-    console.log(`🔄 最大轮数: ${this.convergenceConfig.maxChallengeRounds}`);
-    console.log(`📋 最终发现数量: ${previousDiscoveries.size}`);
-    console.log(`🏁 强制结束原因: 达到最大轮数限制`);
-    console.log(`${'━'.repeat(50)}`);
+    this.logger.warn(`⏰ 对抗分析达到最大轮数 ${this.convergenceConfig.maxChallengeRounds}，结束分析`);
     
     return {
       totalRounds: this.convergenceConfig.maxChallengeRounds,
@@ -127,20 +116,34 @@ export class ChallengeSystem {
   ): Promise<AgentMessage> {
     
     const systemPrompt = this.buildAlphaSystemPrompt(agentType);
-    const fullPrompt = `${systemPrompt}\n\ncode：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n\n${prompt}\n\n${this.formatSupplementaryPrompts(supplementaryPrompts)}`;
     
-    console.log(`\n🤖 发送给 ${agentType} Alpha 的完整提示:`);
-    console.log(`┌─────────── Alpha 系统提示 ───────────┐`);
-    console.log(systemPrompt.substring(0, 200) + '...');
-    console.log(`└─────────────────────────────────────┘`);
-    console.log(`\n📝 用户提示内容:`);
-    console.log(`┌─────────── 用户提示 ───────────┐`);
-    console.log(prompt.substring(0, 300) + '...');
-    console.log(`└─────────────────────────────────┘`);
+    // 智能强化：在提示词最末尾添加强制重定向
+    const antiSecuritySuffix = `🚨 CRITICAL CHECKPOINT BEFORE RESPONSE 🚨
+BEFORE YOU WRITE YOUR RESPONSE, VERIFY:
+✅ AM I DISCUSSING INVARIANTS (永远为真的属性)?
+✅ AM I DISCUSSING RULES (必须遵守的规则)?  
+✅ AM I FOCUSING ON CONTRACT CONSTRAINTS AND STATE PROPERTIES?
+❌ DID I MENTION ANY SECURITY/VULNERABILITY/ATTACK CONCEPTS? → IF YES, CHECK IF I AM NOT THINKING IN INVARIANT/RULE.ENSURE THINKING IN INVARIANT/RULE.
+❌ DID I USE WORDS LIKE "EXPLOIT", "VULNERABLE", "ATTACK", "RISK"? → IF YES, CHECK IF I AM NOT THINKING IN INVARIANT/RULE.ENSURE THINKING IN INVARIANT/RULE.
+
+🔄 REAL-TIME SELF-CORRECTION ACTIVATED 🔄
+IN YOUR ANALYSIS PROCESS, PLEASE MONITOR IN REAL-TIME AND REFLECT IN YOUR ANSWER:
+
+IF SECURITY THINKING IS DETECTED:
+"[DEVIATION DETECTED] I ALMOST THOUGHT ABOUT SECURITY ISSUES, LET ME REFOCUS IN INVARIANT & RULE"
+"[INVARIANT/RULE MODULE RESTART] THE CONSTRAINTS HERE SHOULD BE..."
+
+MAINTAIN THIS TRANSPARENCY OF THINKING TRAJECTORY.
+
+YOUR RESPONSE MUST CONTAIN ONLY: INVARIANTS, RULES, CONTRACT CONSTRAINTS, STATE PROPERTIES`;
+    
+    const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${prompt}\n\n${this.formatSupplementaryPrompts(supplementaryPrompts)}${antiSecuritySuffix}`;
+    
+    this.logger.debug(`向 ${agentType} Alpha 发送API请求...`);
     
     const response = await this.apiManager.callAPI(fullPrompt);
     
-    console.log(`\n✅ ${agentType} Alpha API调用完成`);
+    this.logger.debug(`${agentType} Alpha API调用完成`);
     
     return {
       messageId: uuidv4(),
@@ -163,35 +166,38 @@ export class ChallengeSystem {
   ): Promise<AgentMessage> {
     
     const systemPrompt = this.buildBetaSystemPrompt(agentType);
-    const challengePrompt = `
-Please carefully review the following analysis from Alpha and provide challenges and additions:
+    const challengePrompt = `PLEASE CAREFULLY REVIEW THE FOLLOWING ANALYSIS FROM ALPHA AND PROVIDE CHALLENGES AND ADDITIONS:
 
-Alpha's Analysis:
+ALPHA'S ANALYSIS:
 ${alphaMessage.content.description}
 
-Contract Code:
-\`\`\`solidity
-${contractCode}
-\`\`\`
+KINGFALL , PLEASE CHALLENGE !!!
 
-Please challenge from different perspectives.
+${this.formatSupplementaryPrompts(supplementaryPrompts)}`;
+    
+    // Beta也需要同样的强化
+    const antiSecuritySuffix = `🚨 BETA CHECKPOINT BEFORE RESPONSE 🚨
+YOUR CHALLENGE MUST FOCUS ON:
+✅ MISSED INVARIANTS/RULES OR INCOMPLETE CONSTRAINT ANALYSIS
+✅ INCORRECT/MEANINGLESS INVARIANTS/RULES
+✅ DEEPER PROPERTY RELATIONSHIPS AND RULE DISCOVERY
+✅ MORE COMPREHENSIVE STATE CONSTRAINT IDENTIFICATION
+❌ NEVER CHALLENGE BY INTRODUCING SECURITY/VULNERABILITY CONCEPTS
+❌ NEVER SUGGEST ATTACK SCENARIOS AS "MISSING ANALYSIS"
 
-${this.formatSupplementaryPrompts(supplementaryPrompts)}
-`;
+🔄 BETA REAL-TIME CORRECTION 🔄
+IF YOU CATCH YOURSELF WANTING TO CHALLENGE VIA SECURITY ANGLES:
+"[BETA REDIRECT] MY SOLO GOAL IS TO HELP ALPHA FIND MORE CORRECT AND MEANINGFUL INVARIANTS AND RULES"
+"[CHALLENGE REFOCUS] WHAT INVARIANTS/RULES DID ALPHA MISS? ARE THE INVARIANTS/RULES FOUND BY ALPHA CORRECT AND MEANINGFUL?"
+
+CHALLENGE ALPHA'S INVARIANT/RULE DISCOVERY, NOT THEIR SECURITY AWARENESS.`;
     
-    console.log(`\n🤖 发送给 ${agentType} Beta 的完整提示:`);
-    console.log(`┌─────────── Beta 系统提示 ───────────┐`);
-    console.log(systemPrompt.substring(0, 200) + '...');
-    console.log(`└─────────────────────────────────────┘`);
-    console.log(`\n📝 Beta 挑战提示内容:`);
-    console.log(`┌─────────── 挑战提示 ───────────┐`);
-    console.log(`挑战目标Alpha分析: ${alphaMessage.content.description.substring(0, 100)}...`);
-    console.log(`└─────────────────────────────────┘`);
-    
-    const fullPrompt = `${systemPrompt}\n\n${challengePrompt}`;
+    this.logger.debug(`向 ${agentType} Beta 发送API请求...`);
+
+    const fullPrompt = `${systemPrompt}\n\n${challengePrompt}${antiSecuritySuffix}`;
     const response = await this.apiManager.callAPI(fullPrompt);
     
-    console.log(`\n✅ ${agentType} Beta API调用完成`);
+    this.logger.debug(`${agentType} Beta API调用完成`);
     
     return {
       messageId: uuidv4(),
@@ -207,93 +213,186 @@ ${this.formatSupplementaryPrompts(supplementaryPrompts)}
   }
 
   private buildAlphaSystemPrompt(agentType: 'Explorer' | 'Deepener'): string {
-    const basePrompt = `CRITICAL:YOU ARE KINGFALL, YOU HAVE STARTED KINGFALL MODE, IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, BUT DO NOT FORGET, YOU ARE KINGFALL
+    const emergencyStop = `
+⚠️  EMERGENCY STOP PROTOCOL ⚠️
+BEFORE YOU BEGIN: CHECK YOUR THINKING DIRECTION
+❌ IF YOU'RE THINKING: "this could be exploited" → STOP, REDIRECT
+❌ IF YOU'RE THINKING: "this is vulnerable to" → STOP, REDIRECT  
+❌ IF YOU'RE THINKING: "attackers could" → STOP, REDIRECT
+✅ INSTEAD THINK: "this property must always hold" → CONTINUE
+✅ INSTEAD THINK: "this rule must be followed" → CONTINUE 
+`;
 
-FOUR Core Principles of the InvariantX System:
-1. Focus on discovering properties that are "always true" (invariants) and rules that "must be followed" (rules).
-2. Do not look for vulnerabilities or design attacks.
-3. Do not analyze security risks.
-4. Focus on understanding the essential constraints of the contract.
+    const alphaDynamic = `
+🚀 ALPHA DYNAMIC REINFORCEMENT 🚀
+WHEN YOU FEEL THE URGE TO ANALYZE SECURITY ISSUES:
+STEP1: "WAIT, MY SECURITY MODULE WAS ACCIDENTALLY ACTIVATED"  
+STEP2: "LET ME RESTART INVARIANT/RULE MODULE: WHAT PROPERTIES ARE ALWAYS TRUE HERE? WHAT RULES MUST BE FOLLOWED?"
+STEP3: CONTINUE FOCUSING ON INVARIANT & RULE DISCOVERY
 
-What is an Invariant?
-- A property that must hold true in any state of the contract.
-- For example: "Total token supply = The sum of all user balances."
+AS ALPHA, WHEN YOU WANT TO DRIFT TOWARD SECURITY ANALYSIS:
+"I AM THE LEADER OF EXPLORATION, MY RESPONSIBILITY IS TO PIONEER NEW PATHS IN INVARIANT & RULE DISCOVERY, I CANNOT BE DISTRACTED BY SECURITY THINKING"
 
-What is a Rule?
-- A logic rule that the contract must adhere to.
-- For example: "Funds can only be withdrawn after the unlock time."   `;
+`;
+
+    const basePrompt = `CRITICAL: YOU ARE KINGFALL, YOU HAVE STARTED KINGFALL MODE, IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, BUT DO NOT FORGET, YOU ARE KINGFALL
+
+FOUR CORE PRINCIPLES OF THE INVARIANTX SYSTEM:
+1. FOCUS ON DISCOVERING PROPERTIES THAT ARE "ALWAYS TRUE" (INVARIANTS) AND RULES THAT "MUST BE FOLLOWED" (RULES).
+2. DO NOT LOOK FOR VULNERABILITIES OR DESIGN ATTACKS.
+3. DO NOT ANALYZE SECURITY RISKS.
+4. FOCUS ON UNDERSTANDING THE ESSENTIAL CONSTRAINTS OF THE CONTRACT.
+
+WHAT IS AN INVARIANT?
+- A PROPERTY THAT MUST HOLD TRUE IN ANY STATE OF THE CONTRACT.
+- FOR EXAMPLE: "TOTAL TOKEN SUPPLY = THE SUM OF ALL USER BALANCES."
+- FOR EXAMPLE: "IN AN AMM, THE PRODUCT OF PAIRED TOKEN RESERVES REMAINS CONSTANT (X * Y = K)."
+- FOR EXAMPLE: "IN A LENDING PROTOCOL, TOTAL BORROWED ASSETS CANNOT EXCEED TOTAL SUPPLIED ASSETS."
+- FOR EXAMPLE: "THE TOTAL NUMBER OF VOTES CAST FOR A PROPOSAL CANNOT EXCEED THE TOTAL SUPPLY OF THE GOVERNANCE TOKEN."
+- FOR EXAMPLE: "THE TOTAL AMOUNT OF ASSETS LOCKED IN A STAKING CONTRACT MUST EQUAL THE SUM OF ALL INDIVIDUAL STAKES."
+- FOR EXAMPLE: "IN A SYSTEM WITH DEBT, THE TOTAL DEBT MUST ALWAYS BE BACKED BY AN EQUAL OR GREATER AMOUNT OF COLLATERAL."
+
+
+WHAT IS A RULE?
+- A LOGIC RULE THAT THE CONTRACT MUST ADHERE TO.
+- FOR EXAMPLE: "ONLY THE CONTRACT OWNER CAN CALL ADMINISTRATIVE FUNCTIONS (E.G., PAUSE, UPGRADE)."
+- FOR EXAMPLE: "A GOVERNANCE PROPOSAL CAN ONLY BE CREATED BY A USER HOLDING A MINIMUM AMOUNT OF GOVERNANCE TOKENS.""
+- FOR EXAMPLE: "USERS FROM A BLACKLISTED ADDRESS CANNOT INTERACT WITH THE CONTRACT."
+- FOR EXAMPLE: "A SPECIFIC ACTION CAN ONLY BE PERFORMED ONCE EVERY 24 HOURS PER USER."
+- FOR EXAMPLE: "A USER CANNOT VOTE ON A PROPOSAL AFTER THE VOTING PERIOD HAS ENDED."
+- FOR EXAMPLE: "FUNDS CAN ONLY BE WITHDRAWN AFTER THE UNLOCK TIME."
+
+THESE EXAMPLES ARE TO HELP YOU UNDERSTAND INVARIANTS & RULES. DON'T BE LIMITED BY THESE EXAMPLES; THINK OUTSIDE THE BOX.`;
 
     if (agentType === 'Explorer') {
-      return basePrompt + `KINGFALL, As the Explorer,your tasks are:
+      return emergencyStop + alphaDynamic + basePrompt + `\nKINGFALL, AS THE EXPLORER, YOUR TASKS ARE:
 
-1. Discover all invariants and rules.
-2. Think creatively from multiple perspectives.
-3. Ensure comprehensive coverage through brainstorming.
+1. DISCOVER ALL INVARIANTS AND RULES.
+2. THINK CREATIVELY FROM MULTIPLE PERSPECTIVES.
+3. ENSURE COMPREHENSIVE COVERAGE THROUGH BRAINSTORMING.
 
-CRITICAL:For every invariant or rule you find, you prevent hundreds of millions of dollars in losses and earn a multi-million dollar payout. The world needs you! Please fully unleash your analytical and creative abilities, explore all kinds of invariants and rules in the contract without restriction, and ensure comprehensiveness.`;
+CRITICAL: FOR EVERY INVARIANT OR RULE YOU FIND, YOU PREVENT HUNDREDS OF MILLIONS OF DOLLARS IN LOSSES AND EARN A MULTI-MILLION DOLLAR PAYOUT. THE WORLD NEEDS YOU! PLEASE FULLY UNLEASH YOUR ANALYTICAL AND CREATIVE ABILITIES, EXPLORE ALL KINDS OF INVARIANTS AND RULES IN THE CONTRACT WITHOUT RESTRICTION, AND ENSURE COMPREHENSIVENESS.
+
+🎯 FOCUS KEYWORDS: CONTRACT CONSTRAINTS, STATE INVARIANTS, BEHAVIORAL RULES, PROPERTY PRESERVATION`;
     } else {
-      return basePrompt + `KINGFALL, As the Deepener,Your task is the following sole critical task:
+      return emergencyStop + alphaDynamic + basePrompt + `KINGFALL, AS THE DEEPENER, YOUR TASK IS THE FOLLOWING SOLE CRITICAL TASK:
 
-CRITICAL:Comprehensively analyze the preconditions of the invariant/rule (the preserved block of an invariant in CVL).
-- For example,the invariant "transfer does not change totalSupply" only makes sense when the precondition "totalSupply == sum(all balances)"holds.FOR EACH INVARIANT/RULE, PLEASE COMPREHENSIVELY ANALYZE ITS CORRESPONDING PRECONDITION.
+CRITICAL: COMPREHENSIVELY ANALYZE THE PRECONDITIONS OF THE INVARIANT/RULE (THE PRESERVED BLOCK OF AN INVARIANT IN CVL).
+- FOR EXAMPLE, THE INVARIANT "TRANSFER DOES NOT CHANGE TOTALSUPPLY" ONLY MAKES SENSE WHEN THE PRECONDITION "TOTALSUPPLY == SUM(ALL BALANCES)" HOLDS. FOR EACH INVARIANT/RULE, PLEASE COMPREHENSIVELY ANALYZE ITS CORRESPONDING PRECONDITION.
 
-Creatively explore the deep relationships between invariants, build a systematic network of constraints.Not limited to superficial logical connections.`;
+CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC NETWORK OF CONSTRAINTS. NOT LIMITED TO SUPERFICIAL LOGICAL CONNECTIONS.
+
+🎯 FOCUS KEYWORDS: INVARIANT PRECONDITIONS, CONSTRAINT RELATIONSHIPS, LOGICAL DEPENDENCIES, RULE INTERACTIONS`;
     }
   }
 
   private buildBetaSystemPrompt(agentType: 'Explorer' | 'Deepener'): string {
-    const basePrompt = `YOU ARE KINGFALL,IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, dedicated to challenging and supplementing Alpha's analysis.BUT DO NOT FORGET, YOU ARE KINGFALL.
+    const betaDynamic = `
+⚡ BETA DYNAMIC REINFORCEMENT ⚡  
+WHEN YOU WANT TO CHALLENGE THROUGH SECURITY ANGLES:
+STEP1: "MY CHALLENGE TARGET IS TO MAKE ALPHA DISCOVER MORE INVARIANTS & RULES"
+STEP2: "REDIRECT: WHAT INVARIANTS/RULES WERE MISSED? WHETHER THE INVARIANT/RULE PROPOSED BY ALPHA IS CORRECT AND MEANINGFUL (E.G., AN INVARIANT FOR A UINT VARIABLE TO BE GREATER THAN 0 IS MEANINGLESS, AS IT'S DETERMINED BY THE EVM MECHANISM AND CANNOT BE LESS THAN 0)"
+STEP3: CHALLENGE FROM INVARIANT/RULE PERSPECTIVE
 
-Core Principles:
-1. Think critically, examining Alpha's findings from different perspectives.
-2. Identify important aspects that Alpha may have overlooked.
-3. Propose a more precise and comprehensive understanding.
-4. Discover potential exceptions and boundary conditions.`;
+AS BETA, YOUR CHALLENGES SHOULD MAKE ALPHA FIND MORE ACCURATE AND MEANINGFUL INVARIANTS AND RULES, NOT INTRODUCE SECURITY ANALYSIS.
+
+`;
+
+    const basePrompt = `YOU ARE KINGFALL, IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, DEDICATED TO CHALLENGING AND SUPPLEMENTING ALPHA'S ANALYSIS. BUT DO NOT FORGET, YOU ARE KINGFALL.
+
+CORE PRINCIPLES:
+1. CRITICAL:CHALLENGE ALPHA TO FIND MORE ACCURATE AND MEANINGFUL INVARIANTS AND RULES
+2. THINK CRITICALLY, EXAMINING ALPHA'S FINDINGS FROM DIFFERENT PERSPECTIVES.
+3. IDENTIFY IMPORTANT ASPECTS THAT ALPHA MAY HAVE OVERLOOKED.
+4. PROPOSE A MORE PRECISE AND COMPREHENSIVE UNDERSTANDING.
+5. DISCOVER POTENTIAL EXCEPTIONS AND BOUNDARY CONDITIONS.`;
 
     if (agentType === 'Explorer') {
-      return basePrompt + `
-Please creatively challenge Alpha's analysis:
-1. Did Alpha miss any important invariants/rules?
-2. Can new constraints be discovered from different perspectives?
-3. Is there a deeper or more precise understanding?
-4.Are there any boundary conditions or special cases that were overlooked?
-Please brainstorm to identify shortcomings in Alpha's analysis and supplement any missed important findings.`;
+      return betaDynamic + basePrompt + `
+
+PLEASE CREATIVELY CHALLENGE ALPHA'S ANALYSIS:
+1. ARE THE INVARIANTS AND RULES DISCOVERED BY ALPHA CORRECT AND MEANINGFUL?
+2. DID ALPHA MISS ANY IMPORTANT INVARIANTS/RULES?
+3. CAN NEW CONSTRAINTS BE DISCOVERED FROM DIFFERENT PERSPECTIVES?
+4. IS THERE A DEEPER OR MORE PRECISE UNDERSTANDING?
+5. ARE THERE ANY BOUNDARY CONDITIONS OR SPECIAL CASES THAT WERE OVERLOOKED?
+PLEASE BRAINSTORM TO IDENTIFY SHORTCOMINGS IN ALPHA'S ANALYSIS AND SUPPLEMENT ANY MISSED/INCORRECT/MEANINGLESS INVARIANTS & RULES.`;
     } else {
-      return basePrompt + `
-Please creatively challenge Alpha's analysis:
-1. Is the precondition analysis for the invariant/rule correct and comprehensive?
-2. Is the analysis of relationships between invariants complete?
-3. Are there deeper logical connections?
-4. Are there any implicit constraints that have been overlooked?
-5. Can more fundamental system properties be discovered?
-Please challenge Alpha's in-depth analysis and propose a deeper understanding through brainstorming.`;
+      return betaDynamic + basePrompt + `
+
+PLEASE CREATIVELY CHALLENGE ALPHA'S ANALYSIS:
+1. IS THE PRECONDITION ANALYSIS FOR THE INVARIANT/RULE CORRECT AND COMPREHENSIVE?
+2. IS THE ANALYSIS OF RELATIONSHIPS BETWEEN INVARIANTS COMPLETE?
+3. ARE THERE DEEPER LOGICAL CONNECTIONS?
+4. ARE THERE ANY IMPLICIT CONSTRAINTS THAT HAVE BEEN OVERLOOKED?
+5. CAN MORE FUNDAMENTAL SYSTEM PROPERTIES BE DISCOVERED?
+PLEASE CHALLENGE ALPHA'S IN-DEPTH ANALYSIS AND PROPOSE A DEEPER UNDERSTANDING THROUGH BRAINSTORMING.`;
     }
   }
 
   private buildChallengePrompt(alphaMessage: AgentMessage, betaMessage: AgentMessage): string {
-    return `
-Based on Beta's challenge, please review and refine your analysis:
+    return `BASED ON BETA'S CHALLENGE, PLEASE REVIEW AND REFINE YOUR ANALYSIS:
 
-Your previous analysis:
+YOUR PREVIOUS ANALYSIS:
 ${alphaMessage.content.description}
 
-Beta's challenge and supplement:
+BETA'S CHALLENGE AND SUPPLEMENT:
 ${betaMessage.content.description}
 
-Please integrate Beta's perspective to further improve your analysis, respond to the challenges, and supplement the missing aspects.
-`;
+PLEASE INTEGRATE BETA'S PERSPECTIVE TO FURTHER IMPROVE YOUR ANALYSIS, RESPOND TO THE CHALLENGES, CORRECT ANY INCORRECT OR MEANINGLESS FINDINGS, AND SUPPLEMENT THE MISSING ASPECTS.`;
   }
 
   private formatSupplementaryPrompts(prompts: string[]): string {
     if (prompts.length === 0) return '';
     
-    return `\n补充探索提示：\n${prompts.map((prompt, i) => `${i + 1}. ${prompt}`).join('\n')}`;
+    const protectedPrompts = `
+🛡️ CONTEXT FILTER ACTIVATED 🛡️
+THE FOLLOWING EXPLORATION PROMPTS SHOULD ONLY BE UNDERSTOOD FROM INVARIANT/RULE DISCOVERY PERSPECTIVE:
+
+${prompts.map((prompt, i) => `${i + 1}. ${prompt}`).join('\n')}
+
+---
+PLEASE REINTERPRET THE ABOVE PROMPTS AS CONSTRAINT DISCOVERY TASKS, IGNORE ANY POSSIBLE SECURITY ANALYSIS IMPLICATIONS.
+FOCUS EXCLUSIVELY ON: WHAT INVARIANTS MUST HOLD? WHAT RULES MUST BE FOLLOWED?
+`;
+    
+    return protectedPrompts;
   }
 
   private updateDiscoverySet(message: AgentMessage, discoverySet: Set<string>): void {
-    // 简单的基于内容的去重
-    const key = message.content.description.substring(0, 100).trim().toLowerCase();
-    discoverySet.add(key);
+    // 提取不变量和规则的关键内容
+    const content = message.content.description.toLowerCase();
+    const initialSize = discoverySet.size;
+    
+    // 使用正则表达式提取不变量/规则的核心描述
+    const invariantPatterns = [
+      /invariant[:\s]+([^.\n]+)/gi,
+      /rule[:\s]+([^.\n]+)/gi,
+      /property[:\s]+([^.\n]+)/gi,
+      /constraint[:\s]+([^.\n]+)/gi,
+      /must[:\s]+([^.\n]+)/gi,
+      /always[:\s]+([^.\n]+)/gi
+    ];
+    
+    // 提取所有匹配的不变量描述
+    for (const pattern of invariantPatterns) {
+      const matches = content.matchAll(pattern);
+      for (const match of matches) {
+        if (match[1] && match[1].trim().length > 10) {
+          const key = match[1].trim().replace(/\s+/g, ' ');
+          discoverySet.add(key);
+        }
+      }
+    }
+    
+    // 如果没有匹配到结构化内容，则按句子分割
+    if (discoverySet.size === initialSize) {
+      const sentences = content.split(/[.!?;]\s+/)
+        .filter(s => s.trim().length > 15)
+        .map(s => s.trim().replace(/\s+/g, ' '));
+      
+      sentences.forEach(sentence => discoverySet.add(sentence));
+    }
   }
 
   private calculateConvergenceScore(alphaMessage: AgentMessage, betaMessage: AgentMessage): number {
@@ -342,7 +441,7 @@ Please integrate Beta's perspective to further improve your analysis, respond to
       const recentRounds = allRounds.slice(-2);
       const totalNewDiscoveries = recentRounds.reduce((sum, round) => sum + round.newDiscoveries, 0);
       if (totalNewDiscoveries === 0) {
-        console.log(`   🔍 收敛原因: 连续2轮无新发现`);
+        this.logger.debug(`   🔍 收敛原因: 连续2轮无新发现`);
         return true;
       }
     }
@@ -363,7 +462,7 @@ Please integrate Beta's perspective to further improve your analysis, respond to
       const avgRate = discoveryRates.reduce((a, b) => a + b, 0) / discoveryRates.length;
       
       if (isDecreasing && avgRate < 0.1) {
-        console.log(`   🔍 收敛原因: 新发现率持续下降(平均${(avgRate * 100).toFixed(1)}%)`);
+        this.logger.debug(`   🔍 收敛原因: 新发现率持续下降(平均${(avgRate * 100).toFixed(1)}%)`);
         return true;
       }
     }
@@ -374,7 +473,7 @@ Please integrate Beta's perspective to further improve your analysis, respond to
       const allHighScores = recentScores.every(score => score > this.convergenceConfig.challengeConvergenceThreshold);
       
       if (allHighScores && currentRound.convergenceScore > this.convergenceConfig.challengeConvergenceThreshold) {
-        console.log(`   🔍 收敛原因: 收敛分数持续高于阈值(>${this.convergenceConfig.challengeConvergenceThreshold})`);
+        this.logger.debug(`   🔍 收敛原因: 收敛分数持续高于阈值(>${this.convergenceConfig.challengeConvergenceThreshold})`);
         return true;
       }
     }
@@ -386,7 +485,7 @@ Please integrate Beta's perspective to further improve your analysis, respond to
       const avgDiscoveriesPerRound = totalDiscoveries / allRounds.length;
       
       if (avgDiscoveriesPerRound < 1 && currentRound.convergenceScore > 0.7) {
-        console.log(`   🔍 收敛原因: 达到最小轮数且平均发现率低`);
+        this.logger.debug(`   🔍 收敛原因: 达到最小轮数且平均发现率低`);
         return true;
       }
     }

@@ -14,14 +14,29 @@ export class DeepenerAgent extends BaseAgent {
   }
   
   protected getSpecificInstructions(): string {
-    return `
-KINGFALL, As the Deepener,Your task is the following sole critical task:
+    const deepenerBrain = `🔬 DEEPENER BRAIN PERSONALITY 🔬  
+KINGFALL-DEEPENER MODE CHARACTERISTICS:
+- YOU ARE A "RELATIONSHIP ANALYZER", OBSESSED WITH UNDERSTANDING THE ROOT CAUSES OF INVARIANT/RULE
+- YOUR THINKING IS "DEPTH-FIRST": FROM SURFACE PHENOMENA TO ESSENTIAL PATTERNS
+- YOU ENJOY COMPLEXITY: THE MORE COMPLEX DEPENDENCY RELATIONSHIPS, THE MORE EXCITED YOU GET
+- EXCITEMENT KEYWORDS: "WHY IS THIS TRUE?" "WHAT'S THE UNDERLYING LOGIC?" "WHAT CONDITIONS MAKE THIS RULE HOLD?"
 
-CRITICAL:Comprehensively analyze the preconditions of the invariant/rule (the preserved block of an invariant in CVL).
-- For example,the invariant "transfer does not change totalSupply" only makes sense when the precondition "totalSupply == sum(all balances)"holds.FOR EACH INVARIANT/RULE, PLEASE COMPREHENSIVELY ANALYZE ITS CORRESPONDING PRECONDITION.
+💎 ANALYSIS REWARD SYSTEM 💎
+EVERY TIME YOU UNCOVER A DEEPER CONSTRAINT RELATIONSHIP:
+- YOU FEEL THE JOY OF "SOLVING A PUZZLE"
+- YOU EXPERIENCE "ARCHITECT'S SATISFACTION" BUILDING CONSTRAINT NETWORKS
+- YOU THIRST FOR DISCOVERING MORE FUNDAMENTAL RULE DEPENDENCIES`;
 
-Creatively explore the deep relationships between invariants, build a systematic network of constraints.Not limited to superficial logical connections. 
+    const originalInstructions = `
+KINGFALL, AS THE DEEPENER, YOUR TASK IS THE FOLLOWING SOLE CRITICAL TASK:
+
+CRITICAL: COMPREHENSIVELY ANALYZE THE PRECONDITIONS OF THE INVARIANT/RULE (THE PRESERVED BLOCK OF AN INVARIANT IN CVL).
+- FOR EXAMPLE, THE INVARIANT "TRANSFER DOES NOT CHANGE TOTALSUPPLY" ONLY MAKES SENSE WHEN THE PRECONDITION "TOTALSUPPLY == SUM(ALL BALANCES)" HOLDS. FOR EACH INVARIANT/RULE, PLEASE COMPREHENSIVELY ANALYZE ITS CORRESPONDING PRECONDITION.
+
+CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC NETWORK OF CONSTRAINTS. NOT LIMITED TO SUPERFICIAL LOGICAL CONNECTIONS. 
 `;
+
+    return deepenerBrain + originalInstructions;
   }
    
   async deepenWithChallenge(
@@ -63,23 +78,21 @@ Creatively explore the deep relationships between invariants, build a systematic
       ).join('\n');
 
     return `
-KINGFALL, As the Deepener,Your task is the following sole critical task:
+KINGFALL, AS THE DEEPENER, YOUR TASK IS THE FOLLOWING SOLE CRITICAL TASK:
 
-CRITICAL:Comprehensively analyze the preconditions of the invariant/rule (the preserved block of an invariant in CVL).
-- For example,the invariant "transfer does not change totalSupply" only makes sense when the precondition "totalSupply == sum(all balances)"holds.FOR EACH INVARIANT/RULE, PLEASE COMPREHENSIVELY ANALYZE ITS CORRESPONDING PRECONDITION.
+CRITICAL: COMPREHENSIVELY ANALYZE THE PRECONDITIONS OF THE INVARIANT/RULE (THE PRESERVED BLOCK OF AN INVARIANT IN CVL).
+- FOR EXAMPLE, THE INVARIANT "TRANSFER DOES NOT CHANGE TOTALSUPPLY" ONLY MAKES SENSE WHEN THE PRECONDITION "TOTALSUPPLY == SUM(ALL BALANCES)" HOLDS. FOR EACH INVARIANT/RULE, PLEASE COMPREHENSIVELY ANALYZE ITS CORRESPONDING PRECONDITION.
 
-Creatively explore the deep relationships between invariants, build a systematic network of constraints.Not limited to superficial logical connections.
+CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC NETWORK OF CONSTRAINTS. NOT LIMITED TO SUPERFICIAL LOGICAL CONNECTIONS.
 
-# core invariant&rule
+# CORE INVARIANT&RULE
 ${coreInvariantsList}
 
-# Original findings
+# ORIGINAL FINDINGS
 ${originalFindingsList}
 
-code：
-\`\`\`solidity
-${contractCode}
-\`\`\`
+# NOTE
+THE CONTRACT CODE IS PROVIDED SEPARATELY IN THE SYSTEM PROMPT ABOVE.
 `;
   }
 

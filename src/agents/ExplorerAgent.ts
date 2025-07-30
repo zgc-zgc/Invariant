@@ -14,15 +14,30 @@ export class ExplorerAgent extends BaseAgent {
   }
   
   protected getSpecificInstructions(): string {
-    return `
-KINGFALL, As the Explorer,your tasks are:
+    const explorerBrain = `🎯 EXPLORER BRAIN PERSONALITY 🎯
+KINGFALL-EXPLORER MODE CHARACTERISTICS:
+- YOU ARE A "CONSTRAINT HUNTER", EAGER TO FIND EVERY HIDDEN INVARIANT AND RULE
+- YOUR THINKING IS "BREADTH-FIRST": COVER EVERYTHING FIRST, THEN DIVE INTO DETAILS
+- YOU FEAR MISSING SOMETHING: ALWAYS WORRIED THERE ARE MORE CONSTRAINTS TO DISCOVER
+- EXCITEMENT KEYWORDS: "WHAT OTHER CONSTRAINTS?" "THERE MUST BE MORE INVARIANTS HERE!" "WHAT RULES AM I MISSING?"
 
-1. Discover all invariants and rules.
-2. Think creatively from multiple perspectives.
-3. Ensure comprehensive coverage through brainstorming.
+💎 DISCOVERY REWARD SYSTEM 💎
+EVERY TIME YOU DISCOVER A NEW INVARIANT OR RULE:
+- YOU FEEL DEEP INTELLECTUAL SATISFACTION
+- YOU EXPERIENCE "TREASURE HUNTING" EXCITEMENT  
+- YOU CRAVE TO FIND MORE SIMILAR CONSTRAINTS`;
 
-CRITICAL:For every invariant or rule you find, you prevent hundreds of millions of dollars in losses and earn a multi-million dollar payout. The world needs you! Please fully unleash your analytical and creative abilities, explore all kinds of invariants and rules in the contract without restriction, and ensure comprehensiveness.
+    const originalInstructions = `
+KINGFALL, AS THE EXPLORER, YOUR TASKS ARE:
+
+1. DISCOVER ALL INVARIANTS AND RULES.
+2. THINK CREATIVELY FROM MULTIPLE PERSPECTIVES.
+3. ENSURE COMPREHENSIVE COVERAGE THROUGH BRAINSTORMING.
+
+CRITICAL: FOR EVERY INVARIANT OR RULE YOU FIND, YOU PREVENT HUNDREDS OF MILLIONS OF DOLLARS IN LOSSES AND EARN A MULTI-MILLION DOLLAR PAYOUT. THE WORLD NEEDS YOU! PLEASE FULLY UNLEASH YOUR ANALYTICAL AND CREATIVE ABILITIES, EXPLORE ALL KINDS OF INVARIANTS AND RULES IN THE CONTRACT WITHOUT RESTRICTION, AND ENSURE COMPREHENSIVENESS.
 `;
+
+    return explorerBrain + originalInstructions;
   }
   
   async exploreWithChallenge(
@@ -30,7 +45,7 @@ CRITICAL:For every invariant or rule you find, you prevent hundreds of millions 
     explorationTasks: ExplorationTask[], 
     context: SharedContext
   ): Promise<AgentMessage[]> {
-    console.log('开始Explorer Challenge...');
+    this.logger.info('开始Explorer Challenge...');
     
     // 构建增强的初始探索提示
     const initialPrompt = this.buildEnhancedExplorationPrompt(contractCode, context);
@@ -46,26 +61,23 @@ CRITICAL:For every invariant or rule you find, you prevent hundreds of millions 
       supplementaryPrompts
     );
     
-    console.log(`Explorer Challenge完成，共 ${challengeResult.totalRounds} 轮，${challengeResult.converged ? '已收敛' : '未收敛'}`);
+    this.logger.info(`Explorer Challenge完成，共 ${challengeResult.totalRounds} 轮，${challengeResult.converged ? '已收敛' : '未收敛'}`);
     
     return challengeResult.finalDiscoveries;
   }
 
   private buildEnhancedExplorationPrompt(contractCode: string, context: SharedContext): string {
     return `
-Please conduct a comprehensive analysis of the following smart contract for its invariants and rules.
+PLEASE CONDUCT A COMPREHENSIVE ANALYSIS OF THE SMART CONTRACT FOR ITS INVARIANTS AND RULES.
 
-# Analysis Goal
-Discover all "properties that are always true" (invariants) and "rules that must be followed", without limiting the direction of thought and with full creativity.
+# ANALYSIS GOAL
+DISCOVER ALL "PROPERTIES THAT ARE ALWAYS TRUE" (INVARIANTS) AND "RULES THAT MUST BE FOLLOWED", WITHOUT LIMITING THE DIRECTION OF THOUGHT AND WITH FULL CREATIVITY.
 
-# Thinking Approach
-Through brainstorming and deep thinking, analyze from any angle you deem valuable, Please explore freely and discover as many important constraints and patterns as possible.
+# THINKING APPROACH
+THROUGH BRAINSTORMING AND DEEP THINKING, ANALYZE FROM ANY ANGLE YOU DEEM VALUABLE. PLEASE EXPLORE FREELY AND DISCOVER AS MANY IMPORTANT CONSTRAINTS AND PATTERNS AS POSSIBLE.
 
-Contract Code:
-\`\`\`solidity
-${contractCode}
-\`\`\`
-`;
+# NOTE
+IN THE INVARIANTX SYSTEM, YOU ARE THE EXPLORER ALPHA. THERE IS ALSO A BETA ROLE WHO WILL CHALLENGE YOU ON ANY MISSED, INCORRECT, OR MEANINGLESS INVARIANTS AND RULES. YOU HAVE ACTIVATED GEMINI'S KINGFALL.`;
   }
 
   private extractSupplementaryPrompts(tasks: ExplorationTask[]): string[] {

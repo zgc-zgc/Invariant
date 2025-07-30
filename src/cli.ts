@@ -6,6 +6,8 @@ import path from 'path';
 import { InvariantDiscoveryOrchestrator } from './core/InvariantDiscoveryOrchestrator';
 import { BatchAnalysisOrchestrator } from './core/BatchAnalysisOrchestrator';
 import { ConfigManager } from './config/ConfigManager';
+import { Logger, LogLevel } from './utils/Logger';
+import { aiLogger } from './utils/AICommunicationLogger';
 
 const program = new Command();
 
@@ -22,73 +24,107 @@ program
   .option('-m, --materials <materials-config>', 'Path to materials configuration file', './configs/materials-config.json')
   .option('-o, --output <output-file>', 'Output file for results (JSON format)')
   .option('--verbose', 'Enable verbose logging', false)
+  .option('--log-ai', 'Enable AI communication logging (saves prompts and responses to file)', false)
   .action(async (contractFile: string | undefined, options) => {
     try {
-      console.log('InvariantX - 智能合约不变量发现系统');
-      console.log('=====================================');
+      // 配置日志系统
+      const logLevel = options.verbose ? LogLevel.DEBUG : LogLevel.INFO;
+      const logFilePath = `./logs/invariantx-${new Date().toISOString().split('T')[0]}.log`;
+      
+      Logger.configure({
+        level: logLevel,
+        showTimestamp: true,
+        showModule: true,
+        writeToFile: true,
+        logFilePath: logFilePath
+      });
+      
+      const logger = Logger.getInstance();
+      
+      // 启用AI通信记录（如果指定）
+      if (options.logAi) {
+        aiLogger.enable();
+        logger.info('System', '📝 AI通信记录已启用');
+      }
+      
+      logger.info('System', 'InvariantX - 智能合约不变量发现系统');
+      logger.separator();
       
       // 如果没有指定合约文件，使用材料配置文件进行批量分析
       if (!contractFile) {
-        console.log('未指定合约文件，将从材料配置文件进行批量分析...');
+        logger.info('System', '🔄 进入批量分析模式');
         
         if (!await fileExists(options.materials)) {
-          console.error(`错误：找不到材料配置文件 ${options.materials}`);
-          console.log('提示：请指定合约文件路径，或确保材料配置文件存在');
+          logger.error('System', `❌ 找不到材料配置文件: ${options.materials}`);
+          logger.info('System', '💡 请指定合约文件路径，或确保材料配置文件存在');
           process.exit(1);
         }
         
-        console.log(`正在加载材料配置: ${options.materials}`);
+        logger.info('System', `📁 加载材料配置: ${options.materials}`);
         
         // 使用批量分析
         const batchOrchestrator = new BatchAnalysisOrchestrator(options.materials);
         await batchOrchestrator.analyzeBatch();
         
-        console.log('批量分析完成！');
+        logger.info('System', '🎉 批量分析完成!');
         return;
       }
       
       // 单个合约分析的原有逻辑
       if (!await fileExists(contractFile)) {
-        console.error(`错误：找不到合约文件 ${contractFile}`);
+        logger.error('System', `❌ 找不到合约文件: ${contractFile}`);
         process.exit(1);
       }
       
       // 读取合约代码
-      console.log(`正在加载合约文件: ${contractFile}`);
+      logger.info('System', `📄 正在加载合约: ${contractFile}`);
       const contractCode = await fs.readFile(contractFile, 'utf-8');
       
       if (options.verbose) {
-        console.log(`合约代码长度: ${contractCode.length} 字符`);
+        logger.info('System', `📊 合约代码长度: ${contractCode.length} 字符`);
       }
       
       // 初始化orchestrator
       const orchestrator = new InvariantDiscoveryOrchestrator();
       
       // 开始发现流程
-      console.log('开始Invariant发现流程...');
+      logger.info('System', '🚀 启动不变量发现流程');
       const result = await orchestrator.discoverInvariants(contractCode, options.config);
       
       // 输出结果
       if (options.output) {
         await fs.writeFile(options.output, JSON.stringify(result, null, 2));
-        console.log(`结果已保存到: ${options.output}`);
+        logger.info('System', `💾 结果已保存至: ${options.output}`);
       }
       
       // 控制台输出摘要
-      console.log('\n=== 发现结果摘要 ===');
-      console.log(`合约: ${result.contract || 'Unknown'}`);
-      console.log(`发现的不变量总数: ${result.discoveredInvariants?.length || 0}`);
+      logger.info('System', '\n=== 🎯 发现结果摘要 ===');
+      logger.info('System', `合约: ${result.contract || 'Unknown'}`);
+      logger.info('System', `发现的不变量总数: ${result.discoveredInvariants?.length || 0} 个`);
       
       if (options.verbose) {
-        console.log('\n=== 详细结果 ===');
+        logger.info('System', '\n=== 详细结果 ===');
         const invariants = result.discoveredInvariants || [];
         invariants.forEach((inv, index) => {
-          console.log(`\n${index + 1}. ${inv.description}`);
+          logger.info('System', `\n${index + 1}. ${inv.description}`);
         });
       }
       
+      // 关闭AI通信记录
+      if (options.logAi && aiLogger.isLoggingEnabled()) {
+        logger.info('System', `\n📝 AI通信记录已保存到: ${aiLogger.getLogFilePath()}`);
+        aiLogger.disable();
+      }
+      
     } catch (error) {
-      console.error('发现流程失败:', error);
+      const logger = Logger.getInstance();
+      logger.error('System', `❌ 分析过程出错: ${error}`);
+      
+      // 确保关闭AI通信记录
+      if (aiLogger.isLoggingEnabled()) {
+        aiLogger.disable();
+      }
+      
       process.exit(1);
     }
   });
@@ -99,34 +135,58 @@ program
   .argument('<materials-config>', 'Path to materials configuration file')
   .option('--resume', 'Resume from interrupted analysis', false)
   .option('--verbose', 'Enable verbose logging', false)
+  .option('--log-ai', 'Enable AI communication logging (saves prompts and responses to file)', false)
   .action(async (materialsConfig: string, options) => {
     try {
-      console.log('InvariantX - 批量智能合约不变量发现');
-      console.log('=====================================');
+      const logLevel = options.verbose ? LogLevel.DEBUG : LogLevel.INFO;
+      Logger.configure({ level: logLevel, showTimestamp: true, showModule: true, writeToFile: true });
+      const logger = Logger.getInstance();
+      
+      // 启用AI通信记录（如果指定）
+      if (options.logAi) {
+        aiLogger.enable();
+        logger.info('System', '📝 AI通信记录已启用');
+      }
+
+      logger.info('System', 'InvariantX - 批量智能合约不变量发现');
+      logger.separator();
       
       // 验证材料配置文件
       if (!await fileExists(materialsConfig)) {
-        console.error(`错误：找不到材料配置文件 ${materialsConfig}`);
+        logger.error('System', `错误：找不到材料配置文件 ${materialsConfig}`);
         process.exit(1);
       }
       
-      console.log(`正在加载材料配置: ${materialsConfig}`);
+      logger.info('System', `正在加载材料配置: ${materialsConfig}`);
       
       // 初始化批量分析orchestrator
       const batchOrchestrator = new BatchAnalysisOrchestrator(materialsConfig);
       
       if (options.resume) {
-        console.log('尝试从中断处恢复分析...');
+        logger.info('System', '尝试从中断处恢复分析...');
         await batchOrchestrator.resumeAnalysis();
       } else {
-        console.log('开始批量分析流程...');
+        logger.info('System', '开始批量分析流程...');
         await batchOrchestrator.analyzeBatch();
       }
       
-      console.log('批量分析完成！');
+      logger.info('System', '批量分析完成！');
+      
+      // 关闭AI通信记录
+      if (options.logAi && aiLogger.isLoggingEnabled()) {
+        logger.info('System', `\n📝 AI通信记录已保存到: ${aiLogger.getLogFilePath()}`);
+        aiLogger.disable();
+      }
       
     } catch (error) {
-      console.error('批量分析失败:', error);
+      const logger = Logger.getInstance();
+      logger.error('System', `批量分析失败: ${error}`);
+      
+      // 确保关闭AI通信记录
+      if (aiLogger.isLoggingEnabled()) {
+        aiLogger.disable();
+      }
+      
       process.exit(1);
     }
   });
@@ -140,7 +200,7 @@ program
     if (options.check) {
       const config = ConfigManager.getInstance();
       const apiConfig = config.getAPIConfig();
-      console.log('当前配置:');
+      console.log('当前配置:'); // Keep console.log for simple config display
       console.log(`API端点: ${apiConfig.endpoint}`);
       console.log(`模型: ${apiConfig.model}`);
       console.log(`最大重试次数: ${apiConfig.retryConfig.maxRetries}`);
@@ -159,32 +219,34 @@ program
   .option('-o, --output <output-file>', 'Output file for results')
   .action(async (contractFile: string, prompts: string[], options) => {
     try {
+      const logger = Logger.getInstance();
+      logger.info('System', '开始使用自定义提示进行发现...');
       if (!await fileExists(contractFile)) {
-        console.error(`错误：找不到合约文件 ${contractFile}`);
+        logger.error('System', `错误：找不到合约文件 ${contractFile}`);
         process.exit(1);
       }
       
       const contractCode = await fs.readFile(contractFile, 'utf-8');
       const orchestrator = new InvariantDiscoveryOrchestrator();
       
-      console.log('使用自定义提示进行发现...');
-      console.log('自定义提示:');
+      logger.info('System', '自定义提示:');
       prompts.forEach((prompt, index) => {
-        console.log(`  ${index + 1}. ${prompt}`);
+        logger.info('System', `  ${index + 1}. ${prompt}`);
       });
       
       const result = await orchestrator.discoverWithCustomPrompts(contractCode, prompts);
       
       if (options.output) {
         await fs.writeFile(options.output, JSON.stringify(result, null, 2));
-        console.log(`结果已保存到: ${options.output}`);
+        logger.info('System', `结果已保存到: ${options.output}`);
       } else {
-        console.log('\n结果:');
-        console.log(JSON.stringify(result, null, 2));
+        logger.info('System', '\n结果:');
+        logger.info('System', JSON.stringify(result, null, 2));
       }
       
     } catch (error) {
-      console.error('自定义发现流程失败:', error);
+      const logger = Logger.getInstance();
+      logger.error('System', `自定义发现流程失败: ${error}`);
       process.exit(1);
     }
   });
@@ -219,7 +281,7 @@ MAX_ROUNDS=20
   const envPath = '.env';
   if (!await fileExists(envPath)) {
     await fs.writeFile(envPath, exampleEnv);
-    console.log(`配置示例已创建: ${envPath}`);
+    console.log(`配置示例已创建: ${envPath}`); // Keep console.log for simple user feedback
     console.log('请根据您的需求修改配置文件');
   } else {
     console.log(`配置文件已存在: ${envPath}`);
@@ -228,12 +290,12 @@ MAX_ROUNDS=20
 
 // 处理未捕获的异常
 process.on('uncaughtException', (error) => {
-  console.error('未捕获的异常:', error);
+  console.error('未捕获的异常:', error); // Keep console.error for critical, unhandled errors
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('未处理的Promise拒绝:', reason);
+  console.error('未处理的Promise拒绝:', reason); // Keep console.error for critical, unhandled errors
   process.exit(1);
 });
 
