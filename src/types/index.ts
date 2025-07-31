@@ -29,6 +29,7 @@ export interface Invariant {
   type?: string;
   importance?: string;
   relatedFunctions?: string[];
+  preconditions?: string[];
 }
 
 export interface DiscoveryResult {

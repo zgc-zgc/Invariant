@@ -45,7 +45,7 @@ CRITICAL: FOR EVERY INVARIANT OR RULE YOU FIND, YOU PREVENT HUNDREDS OF MILLIONS
     explorationTasks: ExplorationTask[], 
     context: SharedContext
   ): Promise<AgentMessage[]> {
-    this.logger.info('开始Explorer Challenge...');
+    // 移除重复日志，由上级调用者统一记录
     
     // 构建增强的初始探索提示
     const initialPrompt = this.buildEnhancedExplorationPrompt(contractCode, context);

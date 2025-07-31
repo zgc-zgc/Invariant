@@ -44,7 +44,7 @@ CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC
     originalFindings: AgentMessage[],
     contractCode: string
   ): Promise<AgentMessage[]> {
-    console.log('开始Deepener Challenge...');
+    // 移除重复日志，由上级调用者统一记录
     
     // 构建深化分析的初始提示
     const initialPrompt = this.buildEnhancedDeepeningPrompt(coreInvariants, originalFindings, contractCode);

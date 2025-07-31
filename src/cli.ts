@@ -98,21 +98,24 @@ program
       }
       
       // 控制台输出摘要
-      logger.info('System', '\n=== 🎯 发现结果摘要 ===');
+      logger.info('System', '=== 🎯 发现结果摘要 ===');
       logger.info('System', `合约: ${result.contract || 'Unknown'}`);
       logger.info('System', `发现的不变量总数: ${result.discoveredInvariants?.length || 0} 个`);
       
       if (options.verbose) {
-        logger.info('System', '\n=== 详细结果 ===');
+        logger.info('System', '=== 详细结果 ===');
         const invariants = result.discoveredInvariants || [];
         invariants.forEach((inv, index) => {
-          logger.info('System', `\n${index + 1}. ${inv.description}`);
+          logger.info('System', `${index + 1}. ${inv.description}`);
+          if (inv.preconditions && inv.preconditions.length > 0) {
+            logger.info('System', `   前置条件: ${inv.preconditions.join(', ')}`);
+          }
         });
       }
       
       // 关闭AI通信记录
       if (options.logAi && aiLogger.isLoggingEnabled()) {
-        logger.info('System', `\n📝 AI通信记录已保存到: ${aiLogger.getLogFilePath()}`);
+        logger.info('System', `📝 AI通信记录已保存到: ${aiLogger.getLogFilePath()}`);
         aiLogger.disable();
       }
       
@@ -174,7 +177,7 @@ program
       
       // 关闭AI通信记录
       if (options.logAi && aiLogger.isLoggingEnabled()) {
-        logger.info('System', `\n📝 AI通信记录已保存到: ${aiLogger.getLogFilePath()}`);
+        logger.info('System', `📝 AI通信记录已保存到: ${aiLogger.getLogFilePath()}`);
         aiLogger.disable();
       }
       

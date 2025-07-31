@@ -198,7 +198,8 @@ Output format:
         if (parsed[field] && Array.isArray(parsed[field])) {
           invariants = parsed[field].map((inv: any) => ({
             description: inv['描述'] || inv.description || inv.content || inv,
-            type: 'invariant'
+            type: 'invariant',
+            preconditions: inv['前置条件'] || inv.preconditions || []
           }));
           this.logger.info(`Found ${invariants.length} invariants in field: ${field}`);
           break;
@@ -210,7 +211,8 @@ Output format:
         if (parsed[field] && Array.isArray(parsed[field])) {
           rules = parsed[field].map((rule: any) => ({
             description: rule['描述'] || rule.description || rule.content || rule,
-            type: 'rule'
+            type: 'rule',
+            preconditions: rule['前置条件'] || rule.preconditions || []
           }));
           this.logger.info(`Found ${rules.length} rules in field: ${field}`);
           break;

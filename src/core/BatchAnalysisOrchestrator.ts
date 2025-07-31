@@ -61,7 +61,7 @@ export class BatchAnalysisOrchestrator {
   }
 
   private async analyzeSingleMaterial(material: MaterialItem): Promise<void> {
-    this.logger.info(`\n=== 📋 开始分析材料 ${material.id}: ${material.name} ===`);
+    this.logger.info(`=== 📋 开始分析材料 ${material.id}: ${material.name} ===`);
     
     this.progressManager.markMaterialStarted(material.id);
 
@@ -101,7 +101,7 @@ export class BatchAnalysisOrchestrator {
     
     this.progressManager.markMaterialCompleted(material.id, aggregatedResult);
     
-    this.logger.info(`=== 🎯 完成材料 ${material.id} 分析，发现 ${aggregatedResult.discoveredInvariants?.length || 0} 个不变量 ===\n`);
+    this.logger.info(`=== 🎯 完成材料 ${material.id} 分析，发现 ${aggregatedResult.discoveredInvariants?.length || 0} 个不变量 ===`);
   }
 
 
