@@ -99,7 +99,7 @@ export class InvariantDiscoveryOrchestrator {
     explorationTasks: ExplorationTask[],
     context: SharedContext
   ): Promise<AgentMessage[]> {
-    this.logger.info('🚀 启动 Explorer 对抗探索');
+    // 移除重复日志，由ChallengeSystem记录
     
     // 使用新的Challenge方法
     const startTime = Date.now();
@@ -118,7 +118,7 @@ export class InvariantDiscoveryOrchestrator {
     originalFindings: AgentMessage[],
     contractCode: string
   ): Promise<AgentMessage[]> {
-    this.logger.info('🔍 启动 Deepener 深化分析');
+    // 移除重复日志，由ChallengeSystem记录
     
     // 使用新的Challenge方法
     const deepenerMessages = await this.deepener.deepenWithChallenge(

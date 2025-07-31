@@ -1,8 +1,10 @@
 import { APIConfig } from '../types';
 import { aiLogger } from '../utils/AICommunicationLogger';
+import { createLogger } from '../utils/Logger';
 
 export class APIManager {
   private config: APIConfig;
+  private logger = createLogger('APIManager');
   
   constructor(config: APIConfig) {
     this.config = config;
@@ -22,7 +24,7 @@ export class APIManager {
         // 检查是否是429错误
         if (this.is429Error(error) && retryConfig.handle429) {
           const delay = this.calculateBackoff(attempt);
-          console.log(`Rate limited, waiting ${delay}ms before retry ${attempt + 1}/${retryConfig.maxRetries}...`);
+          this.logger.info(`Rate limited, waiting ${delay}ms before retry ${attempt + 1}/${retryConfig.maxRetries}...`);
           await this.sleep(delay);
           continue;
         }
@@ -30,7 +32,7 @@ export class APIManager {
         // 其他错误也重试
         if (attempt < retryConfig.maxRetries) {
           const delay = this.calculateBackoff(attempt);
-          console.log(`API call failed, retrying in ${delay}ms... (${attempt + 1}/${retryConfig.maxRetries})`);
+          this.logger.warn(`API call failed, retrying in ${delay}ms... (${attempt + 1}/${retryConfig.maxRetries})`);
           await this.sleep(delay);
           continue;
         }

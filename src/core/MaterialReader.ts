@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { MaterialItem } from './ProgressManager';
+import { createLogger } from '../utils/Logger';
 
 export interface MaterialContent {
   id: string;
@@ -11,9 +12,10 @@ export interface MaterialContent {
 }
 
 export class MaterialReader {
+  private logger = createLogger('MaterialReader');
   
   public async readMaterial(material: MaterialItem): Promise<MaterialContent[]> {
-    console.log(`正在读取资料: ${material.name} (${material.path})`);
+    this.logger.info(`正在读取资料: ${material.name} (${material.path})`);
     
     switch (material.type) {
       case 'contract':
@@ -118,10 +120,10 @@ export class MaterialReader {
         }
       }
       
-      console.log(`从文件夹 ${material.path} 读取了 ${results.length} 个文件`);
+      this.logger.info(`从文件夹 ${material.path} 读取了 ${results.length} 个文件`);
       
     } catch (error) {
-      console.error(`读取文件夹 ${material.path} 时出错:`, error);
+      this.logger.error(`读取文件夹 ${material.path} 时出错: ${error}`);
     }
 
     return results;

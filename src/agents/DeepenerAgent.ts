@@ -57,7 +57,7 @@ CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC
       [] // Deepener主要基于内置逻辑，较少使用补充提示
     );
     
-    console.log(`Deepener Challenge完成，共 ${challengeResult.totalRounds} 轮，${challengeResult.converged ? '已收敛' : '未收敛'}`);
+    this.logger.info(`Deepener Challenge完成，共 ${challengeResult.totalRounds} 轮，${challengeResult.converged ? '已收敛' : '未收敛'}`);
     
     return challengeResult.finalDiscoveries;
   }
@@ -85,8 +85,6 @@ CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC
 # ORIGINAL FINDINGS
 ${originalFindingsList}
 
-# NOTE
-THE CONTRACT CODE IS PROVIDED SEPARATELY IN THE SYSTEM PROMPT ABOVE.
 `;
   }
 

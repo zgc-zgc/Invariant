@@ -169,7 +169,7 @@ program
         logger.info('System', '尝试从中断处恢复分析...');
         await batchOrchestrator.resumeAnalysis();
       } else {
-        logger.info('System', '开始批量分析流程...');
+        // 移除重复日志，由BatchOrchestrator记录
         await batchOrchestrator.analyzeBatch();
       }
       
