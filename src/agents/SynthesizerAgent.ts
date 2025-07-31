@@ -87,12 +87,18 @@ Output format:
     initial: AgentMessage[];
     deepened: AgentMessage[];
     core: Invariant[];
+    contractCode: string;
   }): Promise<DiscoveryResult> {
     const initialDiscoveries = data.initial.filter(m => m.messageType === 'discovery');
     const preconditionAnalysis = data.deepened.filter(m => m.messageType === 'discovery');
     
     const prompt = `
 Please synthesize all analysis results to provide a comprehensive formal verification foundation:
+
+# CONTRACT CODE
+\`\`\`solidity
+${data.contractCode}
+\`\`\`
 
 # PHASE 1: DISCOVERED INVARIANTS & RULES
 ${initialDiscoveries.map((d, i) => 

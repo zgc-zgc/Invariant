@@ -61,7 +61,6 @@ export class InvariantDiscoveryOrchestrator {
       // 第一阶段：Explorer Challenge探索
       mainLogger.phase('阶段 1: Explorer 探索');
       const explorerMessages = await this.explorerChallengePhase(contractCode, explorationTasks, context);
-      this.logger.info(`Explorer 探索完成，产生 ${explorerMessages.length} 项发现`);
       
       // 第二阶段：Deepener Challenge深化分析（直接使用Explorer结果，无中间总结）
       mainLogger.phase('阶段 2: Deepener 深化');
@@ -72,7 +71,8 @@ export class InvariantDiscoveryOrchestrator {
       const finalResult = await this.synthesizer.finalSynthesize({
         initial: explorerMessages,
         deepened: deepenerMessages,
-        core: [] // 不再使用中间总结的core invariants
+        core: [], // 不再使用中间总结的core invariants
+        contractCode: contractCode
       });
       
       const executionTime = Date.now() - startTime;
@@ -126,8 +126,6 @@ export class InvariantDiscoveryOrchestrator {
       originalFindings,
       contractCode
     );
-    
-    this.logger.info(`✅ Deepener 深度分析完成，生成 ${deepenerMessages.length} 项深化发现`);
     
     return deepenerMessages;
   }

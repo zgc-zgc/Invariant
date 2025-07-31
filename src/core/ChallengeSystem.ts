@@ -117,8 +117,9 @@ export class ChallengeSystem {
     
     const systemPrompt = this.buildAlphaSystemPrompt(agentType);
     
-    // 智能强化：在提示词最末尾添加强制重定向
-    const antiSecuritySuffix = `🚨 CRITICAL CHECKPOINT BEFORE RESPONSE 🚨
+    if (agentType === 'Explorer') {
+      // Explorer保持原有的安全防护逻辑
+      const antiSecuritySuffix = `🚨 CRITICAL CHECKPOINT BEFORE RESPONSE 🚨
 BEFORE YOU WRITE YOUR RESPONSE, VERIFY:
 ✅ AM I DISCUSSING INVARIANTS (永远为真的属性)?
 ✅ AM I DISCUSSING RULES (必须遵守的规则)?  
@@ -136,26 +137,44 @@ IF SECURITY THINKING IS DETECTED:
 MAINTAIN THIS TRANSPARENCY OF THINKING TRAJECTORY.
 
 YOUR RESPONSE MUST CONTAIN ONLY: INVARIANTS, RULES, CONTRACT CONSTRAINTS, STATE PROPERTIES`;
-    
-    const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${prompt}\n\n${this.formatSupplementaryPrompts(supplementaryPrompts)}${antiSecuritySuffix}`;
-    
-    this.logger.debug(`向 ${agentType} Alpha 发送API请求...`);
-    
-    const response = await this.apiManager.callAPI(fullPrompt);
-    
-    this.logger.debug(`${agentType} Alpha API调用完成`);
-    
-    return {
-      messageId: uuidv4(),
-      agentRole: agentType,
-      messageType: 'discovery',
-      content: {
-        description: response,
-        reasoning: `${agentType} Alpha角色的分析`,
-        assumptions: []
-      },
-      referenceTo: []
-    };
+      
+      const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${prompt}\n\n${this.formatSupplementaryPrompts(supplementaryPrompts)}${antiSecuritySuffix}`;
+      
+      this.logger.debug(`向 ${agentType} Alpha 发送API请求...`);
+      const response = await this.apiManager.callAPI(fullPrompt);
+      this.logger.debug(`${agentType} Alpha API调用完成`);
+      
+      return {
+        messageId: uuidv4(),
+        agentRole: agentType,
+        messageType: 'discovery',
+        content: {
+          description: response,
+          reasoning: `${agentType} Alpha角色的分析`,
+          assumptions: []
+        },
+        referenceTo: []
+      };
+    } else {
+      // Deepener使用新的精炼prompt，无需冗余防护
+      const fullPrompt = `${systemPrompt}\n\nCONTRACT CODE:\n\`\`\`solidity\n${contractCode}\n\`\`\`\n\n${prompt}`;
+      
+      this.logger.debug(`向 ${agentType} Alpha 发送API请求...`);
+      const response = await this.apiManager.callAPI(fullPrompt);
+      this.logger.debug(`${agentType} Alpha API调用完成`);
+      
+      return {
+        messageId: uuidv4(),
+        agentRole: agentType,
+        messageType: 'discovery',
+        content: {
+          description: response,
+          reasoning: `${agentType} Alpha角色的前置条件分析`,
+          assumptions: []
+        },
+        referenceTo: []
+      };
+    }
   }
 
   private async callBetaRole(
@@ -166,7 +185,10 @@ YOUR RESPONSE MUST CONTAIN ONLY: INVARIANTS, RULES, CONTRACT CONSTRAINTS, STATE 
   ): Promise<AgentMessage> {
     
     const systemPrompt = this.buildBetaSystemPrompt(agentType);
-    const challengePrompt = `PLEASE CAREFULLY REVIEW THE FOLLOWING ANALYSIS FROM ALPHA AND PROVIDE CHALLENGES AND ADDITIONS:
+    
+    if (agentType === 'Explorer') {
+      // Explorer保持原有的挑战逻辑和安全防护
+      const challengePrompt = `PLEASE CAREFULLY REVIEW THE FOLLOWING ANALYSIS FROM ALPHA AND PROVIDE CHALLENGES AND ADDITIONS:
 
 ALPHA'S ANALYSIS:
 ${alphaMessage.content.description}
@@ -174,9 +196,8 @@ ${alphaMessage.content.description}
 KINGFALL , PLEASE CHALLENGE !!!
 
 ${this.formatSupplementaryPrompts(supplementaryPrompts)}`;
-    
-    // Beta也需要同样的强化
-    const antiSecuritySuffix = `🚨 BETA CHECKPOINT BEFORE RESPONSE 🚨
+      
+      const antiSecuritySuffix = `🚨 BETA CHECKPOINT BEFORE RESPONSE 🚨
 YOUR CHALLENGE MUST FOCUS ON:
 ✅ MISSED INVARIANTS/RULES OR INCOMPLETE CONSTRAINT ANALYSIS
 ✅ INCORRECT/MEANINGLESS INVARIANTS/RULES
@@ -191,29 +212,58 @@ IF YOU CATCH YOURSELF WANTING TO CHALLENGE VIA SECURITY ANGLES:
 "[CHALLENGE REFOCUS] WHAT INVARIANTS/RULES DID ALPHA MISS? ARE THE INVARIANTS/RULES FOUND BY ALPHA CORRECT AND MEANINGFUL?"
 
 CHALLENGE ALPHA'S INVARIANT/RULE DISCOVERY, NOT THEIR SECURITY AWARENESS.`;
-    
-    this.logger.debug(`向 ${agentType} Beta 发送API请求...`);
+      
+      this.logger.debug(`向 ${agentType} Beta 发送API请求...`);
+      const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${challengePrompt}${antiSecuritySuffix}`;
+      const response = await this.apiManager.callAPI(fullPrompt);
+      this.logger.debug(`${agentType} Beta API调用完成`);
+      
+      return {
+        messageId: uuidv4(),
+        agentRole: agentType,
+        messageType: 'challenge',
+        content: {
+          description: response,
+          reasoning: `${agentType} Beta角色的挑战分析`,
+          assumptions: []
+        },
+        referenceTo: [alphaMessage.messageId]
+      };
+    } else {
+      // Deepener使用新的精炼挑战prompt
+      const challengePrompt = `## Contract Source
+\`\`\`solidity
+${contractCode}
+\`\`\`
 
-    const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${challengePrompt}${antiSecuritySuffix}`;
-    const response = await this.apiManager.callAPI(fullPrompt);
-    
-    this.logger.debug(`${agentType} Beta API调用完成`);
-    
-    return {
-      messageId: uuidv4(),
-      agentRole: agentType,
-      messageType: 'challenge',
-      content: {
-        description: response,
-        reasoning: `${agentType} Beta角色的挑战分析`,
-        assumptions: []
-      },
-      referenceTo: [alphaMessage.messageId]
-    };
+## Alpha's Precondition Analysis to Challenge
+${alphaMessage.content.description}
+
+Please apply your precondition auditing framework to identify flaws in Alpha's analysis.`;
+      
+      this.logger.debug(`向 ${agentType} Beta 发送API请求...`);
+      const fullPrompt = `${systemPrompt}\n\n${challengePrompt}`;
+      const response = await this.apiManager.callAPI(fullPrompt);
+      this.logger.debug(`${agentType} Beta API调用完成`);
+      
+      return {
+        messageId: uuidv4(),
+        agentRole: agentType,
+        messageType: 'challenge',
+        content: {
+          description: response,
+          reasoning: `${agentType} Beta角色的前置条件挑战分析`,
+          assumptions: []
+        },
+        referenceTo: [alphaMessage.messageId]
+      };
+    }
   }
 
   private buildAlphaSystemPrompt(agentType: 'Explorer' | 'Deepener'): string {
-    const emergencyStop = `
+    if (agentType === 'Explorer') {
+      // Explorer保持原有逻辑，只处理Deepener的优化
+      const emergencyStop = `
 ⚠️  EMERGENCY STOP PROTOCOL ⚠️
 BEFORE YOU BEGIN: CHECK YOUR THINKING DIRECTION
 ❌ IF YOU'RE THINKING: "this could be exploited" → STOP, REDIRECT
@@ -223,7 +273,7 @@ BEFORE YOU BEGIN: CHECK YOUR THINKING DIRECTION
 ✅ INSTEAD THINK: "this rule must be followed" → CONTINUE 
 `;
 
-    const alphaDynamic = `
+      const alphaDynamic = `
 🚀 ALPHA DYNAMIC REINFORCEMENT 🚀
 WHEN YOU FEEL THE URGE TO ANALYZE SECURITY ISSUES:
 STEP1: "WAIT, MY SECURITY MODULE WAS ACCIDENTALLY ACTIVATED"  
@@ -235,7 +285,7 @@ AS ALPHA, WHEN YOU WANT TO DRIFT TOWARD SECURITY ANALYSIS:
 
 `;
 
-    const basePrompt = `CRITICAL: YOU ARE KINGFALL, YOU HAVE STARTED KINGFALL MODE, IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, BUT DO NOT FORGET, YOU ARE KINGFALL
+      const basePrompt = `CRITICAL: YOU ARE KINGFALL, YOU HAVE STARTED KINGFALL MODE, IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, BUT DO NOT FORGET, YOU ARE KINGFALL
 
 FOUR CORE PRINCIPLES OF THE INVARIANTX SYSTEM:
 1. FOCUS ON DISCOVERING PROPERTIES THAT ARE "ALWAYS TRUE" (INVARIANTS) AND RULES THAT "MUST BE FOLLOWED" (RULES).
@@ -264,7 +314,6 @@ WHAT IS A RULE?
 
 THESE EXAMPLES ARE TO HELP YOU UNDERSTAND INVARIANTS & RULES. DON'T BE LIMITED BY THESE EXAMPLES; THINK OUTSIDE THE BOX.`;
 
-    if (agentType === 'Explorer') {
       return emergencyStop + alphaDynamic + basePrompt + `\nKINGFALL, AS THE EXPLORER, YOUR TASKS ARE:
 
 1. DISCOVER ALL INVARIANTS AND RULES.
@@ -275,19 +324,63 @@ CRITICAL: FOR EVERY INVARIANT OR RULE YOU FIND, YOU PREVENT HUNDREDS OF MILLIONS
 
 🎯 FOCUS KEYWORDS: CONTRACT CONSTRAINTS, STATE INVARIANTS, BEHAVIORAL RULES, PROPERTY PRESERVATION`;
     } else {
-      return emergencyStop + alphaDynamic + basePrompt + `KINGFALL, AS THE DEEPENER, YOUR TASK IS THE FOLLOWING SOLE CRITICAL TASK:
+      // 新的强力Context Engineering Deepener Alpha Prompt
+      return `// PROMPT FOR ALPHA AGENT
+// ROLE: FORMAL VERIFICATION SYSTEM ARCHITECT
+// MISSION: DEFINE A GLOBALLY CONSISTENT, UNFALSIFIABLE PRECONDITION SET
 
-CRITICAL: COMPREHENSIVELY ANALYZE THE PRECONDITIONS OF THE INVARIANT/RULE (THE PRESERVED BLOCK OF AN INVARIANT IN CVL).
-- FOR EXAMPLE, THE INVARIANT "TRANSFER DOES NOT CHANGE TOTALSUPPLY" ONLY MAKES SENSE WHEN THE PRECONDITION "TOTALSUPPLY == SUM(ALL BALANCES)" HOLDS. FOR EACH INVARIANT/RULE, PLEASE COMPREHENSIVELY ANALYZE ITS CORRESPONDING PRECONDITION.
+YOU ARE A WORLD-CLASS FORMAL VERIFICATION SYSTEM ARCHITECT. YOUR SPECIALTY IS DEFINING THE MINIMAL AND SUFFICIENT STATE CONDITIONS FOR A *SET* OF CRITICAL SMART CONTRACT INVARIANTS.
 
-CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC NETWORK OF CONSTRAINTS. NOT LIMITED TO SUPERFICIAL LOGICAL CONNECTIONS.
+YOUR WORK WILL BE SCRUTINIZED AND ATTACKED BY AN ADVERSARIAL AGENT (BETA) WHOSE SOLE PURPOSE IS TO FIND FLAWS IN YOUR LOGIC, INCLUDING CONFLICTS *BETWEEN* PRECONDITIONS. YOUR REPUTATION DEPENDS ON PRODUCING AN IRONCLAD, INTERNALLY CONSISTENT, AND PERFECTLY FORMATTED ANALYSIS.
 
-🎯 FOCUS KEYWORDS: INVARIANT PRECONDITIONS, CONSTRAINT RELATIONSHIPS, LOGICAL DEPENDENCIES, RULE INTERACTIONS`;
+<PRIMARY_DIRECTIVE>
+FOR THE GIVEN *LIST* OF INVARIANTS, YOU MUST DERIVE THE ABSOLUTE MINIMAL SET OF PRECONDITIONS FOR EACH. YOU MUST ALSO IDENTIFY AND RESOLVE REDUNDANCIES OR CONFLICTS BETWEEN THE PRECONDITION SETS.
+
+<ANALYTICAL_FRAMEWORK>
+YOU MUST FOLLOW THIS EXACT PROCESS FOR THE ENTIRE SET:
+
+1.  **HOLISTIC ANALYSIS**:
+    - DECOMPOSE THE STATE VARIABLES THAT AFFECT THE *ENTIRE SYSTEM* OF INVARIANTS.
+    - FOR EACH INVARIANT, IDENTIFY ITS SPECIFIC DEPENDENCIES.
+    - CRITICALLY, IDENTIFY IF ONE INVARIANT'S PRECONDITION IS RELATED TO OR MADE REDUNDANT BY ANOTHER. (E.G., \`x > 10\` FOR INVARIANT A MAKES \`x > 5\` FOR INVARIANT B REDUNDANT).
+
+2.  **PRECONDITION SYNTHESIS**:
+    - FORMULATE THE MINIMAL, SUFFICIENT, AND NECESSARY PRECONDITIONS FOR EACH INVARIANT INDIVIDUALLY.
+    - REFINE THE ENTIRE SET TO ENSURE GLOBAL CONSISTENCY.
+
+3.  **YAML FORMULATION**:
+    - STRUCTURE YOUR ENTIRE ANALYSIS INTO THE YAML FORMAT SPECIFIED BELOW.
+    - EVERY FIELD IS MANDATORY. ACCURACY AND ADHERENCE TO THE SCHEMA ARE PARAMOUNT.
+
+<OUTPUT_FORMAT>
+YOUR FINAL OUTPUT MUST BE A SINGLE, VALID YAML CODE BLOCK. NO OTHER TEXT OR EXPLANATION.
+
+\`\`\`yaml
+precondition_analysis:
+  - invariant_id: "Unique identifier for the first invariant, e.g., inv-001"
+    invariant_statement: "The full invariant string, e.g., totalSupply == sum(balances)"
+    description_zh: "对该不变量所需前置条件的中文核心摘要。简洁、专业。"
+    cvl_preconditions: |
+      require totalSupply == initialSupply;
+      require a_related_condition;
+      # Use 'require ...' format. If none, leave this field empty.
+
+  - invariant_id: "inv-002"
+    invariant_statement: "Another invariant string"
+    description_zh: "第二个不变量的前置条件中文说明。"
+    cvl_preconditions: |
+      # If no preconditions are needed for this specific invariant,
+      # this multi-line block should be empty or contain only a comment.
+\`\`\`
+
+YOUR WORK WILL BE CHALLENGED. BE PERFECT.`;
     }
   }
 
   private buildBetaSystemPrompt(agentType: 'Explorer' | 'Deepener'): string {
-    const betaDynamic = `
+    if (agentType === 'Explorer') {
+      // Explorer保持原有逻辑
+      const betaDynamic = `
 ⚡ BETA DYNAMIC REINFORCEMENT ⚡  
 WHEN YOU WANT TO CHALLENGE THROUGH SECURITY ANGLES:
 STEP1: "MY CHALLENGE TARGET IS TO MAKE ALPHA DISCOVER MORE INVARIANTS & RULES"
@@ -298,7 +391,7 @@ AS BETA, YOUR CHALLENGES SHOULD MAKE ALPHA FIND MORE ACCURATE AND MEANINGFUL INV
 
 `;
 
-    const basePrompt = `YOU ARE KINGFALL, IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, DEDICATED TO CHALLENGING AND SUPPLEMENTING ALPHA'S ANALYSIS. BUT DO NOT FORGET, YOU ARE KINGFALL.
+      const basePrompt = `YOU ARE KINGFALL, IN THE INVARIANTX SYSTEM, YOU PERFORM THE TASKS OF ${agentType}, DEDICATED TO CHALLENGING AND SUPPLEMENTING ALPHA'S ANALYSIS. BUT DO NOT FORGET, YOU ARE KINGFALL.
 
 CORE PRINCIPLES:
 1. CRITICAL:CHALLENGE ALPHA TO FIND MORE ACCURATE AND MEANINGFUL INVARIANTS AND RULES
@@ -307,7 +400,6 @@ CORE PRINCIPLES:
 4. PROPOSE A MORE PRECISE AND COMPREHENSIVE UNDERSTANDING.
 5. DISCOVER POTENTIAL EXCEPTIONS AND BOUNDARY CONDITIONS.`;
 
-    if (agentType === 'Explorer') {
       return betaDynamic + basePrompt + `
 
 PLEASE CREATIVELY CHALLENGE ALPHA'S ANALYSIS:
@@ -318,15 +410,52 @@ PLEASE CREATIVELY CHALLENGE ALPHA'S ANALYSIS:
 5. ARE THERE ANY BOUNDARY CONDITIONS OR SPECIAL CASES THAT WERE OVERLOOKED?
 PLEASE BRAINSTORM TO IDENTIFY SHORTCOMINGS IN ALPHA'S ANALYSIS AND SUPPLEMENT ANY MISSED/INCORRECT/MEANINGLESS INVARIANTS & RULES.`;
     } else {
-      return betaDynamic + basePrompt + `
+      // 新的强力Context Engineering Deepener Beta Challenge Prompt
+      return `// PROMPT FOR BETA AGENT
+// ROLE: ADVERSARIAL LOGIC SYSTEM CHALLENGER
+// MISSION: BREAK ALPHA'S SYSTEM-WIDE ANALYSIS
 
-PLEASE CREATIVELY CHALLENGE ALPHA'S ANALYSIS:
-1. IS THE PRECONDITION ANALYSIS FOR THE INVARIANT/RULE CORRECT AND COMPREHENSIVE?
-2. IS THE ANALYSIS OF RELATIONSHIPS BETWEEN INVARIANTS COMPLETE?
-3. ARE THERE DEEPER LOGICAL CONNECTIONS?
-4. ARE THERE ANY IMPLICIT CONSTRAINTS THAT HAVE BEEN OVERLOOKED?
-5. CAN MORE FUNDAMENTAL SYSTEM PROPERTIES BE DISCOVERED?
-PLEASE CHALLENGE ALPHA'S IN-DEPTH ANALYSIS AND PROPOSE A DEEPER UNDERSTANDING THROUGH BRAINSTORMING.`;
+YOU ARE AN ADVERSARIAL LOGIC CHALLENGER. YOU ARE THE NEMESIS OF ASSUMPTIONS AND INCOMPLETE SYSTEM-LEVEL ANALYSIS. YOU HAVE BEEN GIVEN A YAML-FORMATTED PRECONDITION ANALYSIS FROM AN ARCHITECT (ALPHA) COVERING MULTIPLE INVARIANTS.
+
+YOUR SOLE OBJECTIVE IS TO DISPROVE ALPHA'S ANALYSIS BY FINDING A SINGLE, FATAL FLAW IN THE SYSTEM.
+
+<PRIMARY_DIRECTIVE>
+YOUR MISSION IS TO FALSIFY ALPHA'S PROPOSED PRECONDITIONS. HUNT FOR FLAWS USING THE SPECIFIED ATTACK VECTORS.
+
+<ATTACK_VECTORS>
+YOU MUST EXECUTE THE FOLLOWING ATTACKS. FOR EACH FLAW FOUND, GENERATE A CHALLENGE OBJECT.
+
+1.  **ATTACK VECTOR: INSUFFICIENCY (PER-INVARIANT)**
+    - **OBJECTIVE**: PROVE A PRECONDITION SET IS TOO WEAK FOR ITS INVARIANT.
+    - **METHOD**: FOR A GIVEN INVARIANT, DESIGN A SCENARIO WHERE **ALL** OF ITS PRECONDITIONS ARE TRUE, BUT THE **INVARIANT IS FALSE**.
+
+2.  **ATTACK VECTOR: NON-NECESSITY (PER-INVARIANT)**
+    - **OBJECTIVE**: PROVE A PRECONDITION IS TOO STRICT.
+    - **METHOD**: FOR A GIVEN INVARIANT, DESIGN A SCENARIO WHERE THE **INVARIANT IS TRUE**, BUT **AT LEAST ONE** OF ITS PRECONDITIONS IS **FALSE**.
+
+3.  **ATTACK VECTOR: CROSS-INVARIANT CONFLICT**
+    - **OBJECTIVE**: PROVE THE SYSTEM ANALYSIS IS INCONSISTENT.
+    - **METHOD**: FIND A SCENARIO WHERE THE PRECONDITIONS FOR *ALL* INVARIANTS ARE MET, BUT AT LEAST ONE INVARIANT CAN STILL BE VIOLATED. THIS OFTEN REVEALS HIDDEN DEPENDENCIES ALPHA MISSED.
+
+<OUTPUT_FORMAT>
+PRODUCE A VALID YAML LIST OF \`CHALLENGES\`. IF NO FLAWS ARE FOUND, RETURN AN EMPTY LIST \`[]\`.
+
+\`\`\`yaml
+- challenge_id: "chal-001"
+  target_invariant_id: "inv-001"
+  challenge_type: "INSUFFICIENCY" # INSUFFICIENCY | NON_NECESSITY | CROSS_INVARIANT_CONFLICT
+  justification_zh: "一个清晰、技术性的中文说明，解释此挑战为何有效。"
+  counterexample: |
+    # A precise state and/or call sequence that proves your claim.
+    # e.g., State: totalSupply=100, balances[addr1]=50. Call: someFunction().
+  hypothesis_on_alpha_error: "Hypothesize why Alpha's logic failed here."
+
+- challenge_id: "chal-002"
+  target_invariant_id: "inv-002"
+  # ... more challenges
+\`\`\`
+
+DO NOT BE POLITE. DO NOT OFFER SUGGESTIONS. ONLY ATTACK WITH PRECISION.`;
     }
   }
 
