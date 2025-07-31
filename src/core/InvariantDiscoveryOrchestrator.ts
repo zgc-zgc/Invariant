@@ -63,24 +63,16 @@ export class InvariantDiscoveryOrchestrator {
       const explorerMessages = await this.explorerChallengePhase(contractCode, explorationTasks, context);
       this.logger.info(`Explorer 探索完成，产生 ${explorerMessages.length} 项发现`);
       
-      // 识别核心不变量
-      mainLogger.phase('核心不变量识别');
-      const coreInvariants = await this.synthesizer.identifyCore(explorerMessages);
-      this.logger.info(`成功识别 ${coreInvariants.length} 个核心不变量`);
-      coreInvariants.forEach((invariant, index) => {
-        this.logger.debug(`   ${index + 1}. ${invariant.description.substring(0, 80)}`);
-      });
-      
-      // 第二阶段：Deepener Challenge深化分析
+      // 第二阶段：Deepener Challenge深化分析（直接使用Explorer结果，无中间总结）
       mainLogger.phase('阶段 2: Deepener 深化');
-      const deepenerMessages = await this.deepenerChallengePhase(coreInvariants, explorerMessages, contractCode);
+      const deepenerMessages = await this.deepenerChallengePhase([], explorerMessages, contractCode);
       
       // 第三阶段：最终综合
       mainLogger.phase('阶段 3: 最终综合');
       const finalResult = await this.synthesizer.finalSynthesize({
         initial: explorerMessages,
         deepened: deepenerMessages,
-        core: coreInvariants
+        core: [] // 不再使用中间总结的core invariants
       });
       
       const executionTime = Date.now() - startTime;

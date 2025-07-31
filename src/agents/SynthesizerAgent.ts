@@ -88,40 +88,48 @@ Output format:
     deepened: AgentMessage[];
     core: Invariant[];
   }): Promise<DiscoveryResult> {
-    const allMessages = [...data.initial, ...data.deepened];
+    const initialDiscoveries = data.initial.filter(m => m.messageType === 'discovery');
+    const preconditionAnalysis = data.deepened.filter(m => m.messageType === 'discovery');
     
     const prompt = `
-Please synthesize all analysis results:
+Please synthesize all analysis results to provide a comprehensive formal verification foundation:
 
-Core Invariants:
-${data.core.map(inv => `- ${inv.description}`).join('\n')}
-
-All Discoveries:
-${allMessages.filter(m => m.messageType === 'discovery').map((d, i) => 
-  `${i + 1}. ${d.content.description} (${d.discovery?.category})`
+# PHASE 1: DISCOVERED INVARIANTS & RULES
+${initialDiscoveries.map((d, i) => 
+  `${i + 1}. ${d.content.description}`
 ).join('\n')}
 
-In-depth Analysis:
-${allMessages.filter(m => m.messageType === 'challenge').map((d, i) => 
-  `${i + 1}. ${d.content.description}\n   Analysis:${d.content.reasoning.substring(0, 200)}...`
+# PHASE 2: PRECONDITIONS & DEPENDENCIES (From Deepener Analysis)
+${preconditionAnalysis.map((d, i) => 
+  `${i + 1}. ${d.content.description}`
 ).join('\n')}
 
-Please provide the final synthesized result:
-1. Deduplicate and merge similar invariants.
-2. Sort by importance.
-3. Provide a clear description for each invariant.
-4.Indicate the type (Invariant or Rule).
+# SYNTHESIS REQUIREMENTS:
+1. ORGANIZE ALL INVARIANTS & RULES WITH THEIR CORRESPONDING PRECONDITIONS
+2. CREATE COMPLETE DEPENDENCY NETWORKS FOR FORMAL VERIFICATION
+3. ENSURE EACH INVARIANT HAS ITS REQUIRED PRECONDITIONS TO AVOID FALSE POSITIVES
+4. PREVENT STATE UNREACHABILITY ISSUES IN CERTORA VERIFICATION
+
+YOUR FINAL OUTPUT MUST INCLUDE:
+- PRIMARY INVARIANTS & RULES
+- THEIR CORRESPONDING PRECONDITIONS (requireInvariant blocks)
+- DEPENDENCY RELATIONSHIPS
+- VERIFICATION-READY CONSTRAINTS
+
+This synthesis will directly support Certora formal verification without false positives or unreachable states.
 
 Output format:
 {
   "不变量": [
     {
-      "描述": "不变量相关描述"
+      "描述": "不变量相关描述",
+      "前置条件": ["前置条件1", "前置条件2"]
     }
   ],
   "规则":[
     {
-      "描述":"规则相关描述"
+      "描述":"规则相关描述",
+      "前置条件": ["前置条件1", "前置条件2"] 
     }
   ]
 }
