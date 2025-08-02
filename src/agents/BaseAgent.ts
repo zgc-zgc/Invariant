@@ -1,5 +1,5 @@
 import { APIManager } from '../api/APIManager';
-import { AgentMessage, SharedContext, ExplorationTask } from '../types';
+import { AgentMessage, SharedContext } from '../types';
 import { ExecutionSnapshot } from '../types/SessionTypes';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../utils/Logger';

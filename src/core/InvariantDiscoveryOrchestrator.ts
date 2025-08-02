@@ -6,13 +6,11 @@ import { DeepenerAgent } from '../agents/DeepenerAgent';
 import { SynthesizerAgent } from '../agents/SynthesizerAgent';
 import { SimpleSessionManager } from './SimpleSessionManager';
 import { SharedContext, AgentMessage, DiscoveryResult, ExplorationTask, Invariant } from '../types';
-import { ExecutionSnapshot } from '../types/SessionTypes';
 import { createLogger, Logger } from '../utils/Logger';
 
 export class InvariantDiscoveryOrchestrator {
   private configManager: ConfigManager;
   private apiManager: APIManager;
-  private configLoader: DynamicConfigLoader;
   private simpleSessionManager: SimpleSessionManager;
   private logger = createLogger('Orchestrator');
   
@@ -27,7 +25,6 @@ export class InvariantDiscoveryOrchestrator {
   constructor() {
     this.configManager = ConfigManager.getInstance();
     this.apiManager = new APIManager(this.configManager.getAPIConfig());
-    this.configLoader = new DynamicConfigLoader();
     this.simpleSessionManager = SimpleSessionManager.getInstance();
     
     // Initialize agents

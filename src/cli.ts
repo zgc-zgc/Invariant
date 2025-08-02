@@ -2,10 +2,8 @@
 
 import { Command } from 'commander';
 import { promises as fs } from 'fs';
-import path from 'path';
 import { InvariantDiscoveryOrchestrator } from './core/InvariantDiscoveryOrchestrator';
 import { BatchAnalysisOrchestrator } from './core/BatchAnalysisOrchestrator';
-import { ConfigManager } from './config/ConfigManager';
 import { Logger, LogLevel } from './utils/Logger';
 import { aiLogger } from './utils/AICommunicationLogger';
 import { SimpleSessionManager } from './core/SimpleSessionManager';
@@ -208,7 +206,7 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
   console.error('未处理的Promise拒绝:', reason);
   process.exit(1);
 });

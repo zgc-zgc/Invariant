@@ -1,6 +1,6 @@
 import { BaseAgent } from './BaseAgent';
 import { APIManager } from '../api/APIManager';
-import { AgentMessage, SharedContext, Invariant, ChallengeResult } from '../types';
+import { AgentMessage, Invariant, ChallengeResult } from '../types';
 import { ChallengeSystem } from '../core/ChallengeSystem';
 import { ConfigManager } from '../config/ConfigManager';
 
@@ -72,9 +72,9 @@ CREATIVELY EXPLORE THE DEEP RELATIONSHIPS BETWEEN INVARIANTS, BUILD A SYSTEMATIC
   }
 
   private buildEnhancedDeepeningPrompt(
-    coreInvariants: Invariant[],
+    _coreInvariants: Invariant[],
     originalFindings: AgentMessage[],
-    contractCode: string
+    _contractCode: string
   ): string {
     // 直接使用原始发现，不再处理核心不变量
     const originalFindingsList = originalFindings

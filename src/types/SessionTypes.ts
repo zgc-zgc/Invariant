@@ -55,63 +55,6 @@ export interface ExecutionSnapshot {
   };
 }
 
-export interface SessionMetadata {
-  sessionId: string;
-  startTime: number;
-  lastUpdateTime: number;
-  lastPersistTime: number;
-  totalUpdates: number;
-  persistCount: number;
-  memorySize: number;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-}
-
-export interface PersistenceDecision {
-  shouldPersist: boolean;
-  reasons: string[];
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  estimatedTime: number;
-}
-
-export interface PersistenceTask {
-  sessionId: string;
-  snapshot: ExecutionSnapshot;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  timestamp: number;
-  retryCount: number;
-}
-
-export interface HybridConfig {
-  persistence: {
-    timeStrategy: {
-      forceInterval: number;      // 强制持久化间隔 (ms)
-      maxMemoryTime: number;      // 最大内存保留时间 (ms)
-    };
-    businessStrategy: {
-      criticalPhases: string[];   // 关键阶段
-      criticalSubPhases: string[]; // 关键子阶段
-    };
-    performanceStrategy: {
-      maxMemorySize: number;      // 内存限制 (bytes)
-      batchWindow: number;        // 批处理窗口 (ms)
-      compressionEnabled: boolean; // 启用压缩
-    };
-  };
-  recovery: {
-    autoRecover: boolean;         // 自动恢复
-    maxRecoveryAttempts: number;  // 最大恢复尝试次数
-    recoveryTimeout: number;      // 恢复超时时间 (ms)
-  };
-}
-
-export interface RecoveryPoint {
-  stepId: string;
-  description: string;
-  snapshot: ExecutionSnapshot;
-  canResume: boolean;
-  resumeInstructions?: string;
-}
-
 export interface APICallRecord {
   id: string;
   sessionId: string;
@@ -125,12 +68,4 @@ export interface APICallRecord {
   error?: string;
   retryCount: number;
   method: 'fetch' | 'axios';
-}
-
-export interface SessionRecoveryInfo {
-  sessionId: string;
-  availableRecoveryPoints: RecoveryPoint[];
-  recommendedRecoveryPoint: RecoveryPoint;
-  estimatedLostProgress: number; // 预估丢失的进度 (0-1)
-  canAutomaticRecover: boolean;
 }

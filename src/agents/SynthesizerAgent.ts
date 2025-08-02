@@ -1,10 +1,8 @@
 import { BaseAgent } from './BaseAgent';
 import { APIManager } from '../api/APIManager';
-import { AgentMessage, SharedContext, Invariant, DiscoveryResult } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+import { AgentMessage, Invariant, DiscoveryResult } from '../types';
 import { promises as fs } from 'fs';
 import * as path from 'path';
-import { createLogger } from '../utils/Logger';
 
 export class SynthesizerAgent extends BaseAgent {
   constructor(apiManager: APIManager) {

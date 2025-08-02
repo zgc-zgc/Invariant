@@ -8,10 +8,10 @@
       "name": "示例代币合约",
       "path": "./examples/SimpleToken.sol",
       "priority": "high",
-      "completed": false
+      "completed": true
     }
   ],
   "outputPath": "./results/batch-analysis-results.json",
   "resumeFrom": "001",
-  "lastUpdated": "2025-08-02T01:01:32.477Z"
+  "lastUpdated": "2025-08-02T01:32:36.153Z"
 }

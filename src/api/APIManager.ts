@@ -113,7 +113,7 @@ export class APIManager {
     return `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
   
-  private async makeAPICallWithFetch(prompt: string, agent?: string, callRecord?: APICallRecord): Promise<string> {
+  private async makeAPICallWithFetch(prompt: string, agent?: string, _callRecord?: APICallRecord): Promise<string> {
     const requestBody = this.buildRequestBody(prompt);
     
     // 记录发送的提示词
@@ -175,7 +175,7 @@ export class APIManager {
     }
   }
   
-  private async makeAPICallWithAxios(prompt: string, agent?: string, callRecord?: APICallRecord): Promise<string> {
+  private async makeAPICallWithAxios(prompt: string, agent?: string, _callRecord?: APICallRecord): Promise<string> {
     const requestBody = this.buildRequestBody(prompt);
     
     // 记录发送的提示词
@@ -284,49 +284,6 @@ export class APIManager {
       averageResponseTime: Math.round(avgResponseTime),
       methodUsage: { fetch: fetchCalls, axios: axiosCalls }
     };
-  }
-
-  private async makeAPICall(prompt: string, agent?: string): Promise<string> {
-    const requestBody = this.buildRequestBody(prompt);
-    
-    // 记录发送的提示词
-    aiLogger.logPrompt(agent || 'Unknown', prompt, {
-      model: this.config.model,
-      endpoint: this.config.endpoint
-    });
-    
-    const startTime = Date.now();
-    
-    const response = await fetch(this.config.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.apiKey}`
-        // 移除 anthropic-version 头部
-      },
-      body: JSON.stringify(requestBody)
-    });
-    
-    if (!response.ok) {
-      const error = `HTTP ${response.status}: ${response.statusText}`;
-      aiLogger.logSystem(`API调用失败: ${error}`, {
-        status: response.status,
-        statusText: response.statusText
-      });
-      throw new Error(error);
-    }
-    
-    const data = await response.json();
-    const responseContent = this.extractResponseContent(data);
-    const duration = Date.now() - startTime;
-    
-    // 记录AI的响应
-    aiLogger.logResponse(agent || 'Unknown', responseContent, duration, {
-      model: this.config.model,
-      responseLength: responseContent.length
-    });
-    
-    return responseContent;
   }
   
   private buildRequestBody(prompt: string): Record<string, any> {

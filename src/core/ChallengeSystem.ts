@@ -15,56 +15,13 @@ export class ChallengeSystem {
   private currentSessionId: string | null = null;
   private lastFailureTimestamp: number = 0;
   private readonly FAILURE_COOLDOWN = 5000; // 5秒内的连续失败只创建一次恢复点
-  
-  // 添加当前API调用状态跟踪
-  private currentAPICall: {
-    prompt: string;
-    agentRole: 'Explorer' | 'Deepener';
-    context: any;
-    startTime: number;
-  } | null = null;
 
   constructor(apiManager: APIManager, convergenceConfig: ConvergenceConfig) {
     this.apiManager = apiManager;
     this.convergenceConfig = convergenceConfig;
     this.progressDisplay = new ProgressDisplay();
     this.sessionManager = SimpleSessionManager.getInstance();
-    
-    // 不再注册进程中断处理器，因为手动中断不需要恢复点
-    // this.setupInterruptHandler();
   }
-
-  /**
-   * 设置进程中断处理器 - 已废弃，手动中断不创建恢复点
-   */
-  /*
-    const interruptHandler = async () => {
-      if (this.currentAPICall && this.currentSessionId) {
-        this.logger.warn('🛑 检测到进程中断，尝试创建恢复点...');
-        
-        try {
-          const error = new Error('进程被用户中断（Ctrl+C）');
-          await this.createRecoveryPointOnFailure(
-            this.currentAPICall.prompt,
-            this.currentAPICall.agentRole,
-            this.currentAPICall.context,
-            error
-          );
-          this.logger.info('✅ 中断恢复点已创建');
-        } catch (error) {
-          this.logger.error(`❌ 创建中断恢复点失败: ${(error as Error).message}`);
-        }
-      }
-      
-      // 优雅退出
-      process.exit(0);
-    };
-    
-    // 注册中断处理器（只注册一次）
-    process.once('SIGINT', interruptHandler);
-    process.once('SIGTERM', interruptHandler);
-  }
-  */
 
   /**
    * 设置当前会话ID，用于创建恢复点
@@ -79,20 +36,10 @@ export class ChallengeSystem {
   private async safeCallAPI(prompt: string, agentRole: 'Explorer' | 'Deepener', context?: any): Promise<string> {
     this.logger.debug(`🔍 safeCallAPI: 准备调用API (Agent: ${agentRole}, SessionID: ${this.currentSessionId})`);
     
-    // 记录当前API调用状态，用于中断时创建恢复点
-    this.currentAPICall = {
-      prompt,
-      agentRole,
-      context,
-      startTime: Date.now()
-    };
-    
     try {
       const response = await this.apiManager.callAPI(prompt, agentRole);
       this.logger.debug(`✅ safeCallAPI: API调用成功 (Agent: ${agentRole})`);
       
-      // 清理当前API调用状态
-      this.currentAPICall = null;
       return response;
     } catch (error) {
       this.logger.warn(`🚨 safeCallAPI: API调用失败 (Agent: ${agentRole}): ${(error as Error).message}`);
@@ -105,8 +52,6 @@ export class ChallengeSystem {
         this.logger.error(`❌ safeCallAPI: 恢复点创建失败: ${(recoveryError as Error).message}`);
       }
       
-      // 清理当前API调用状态
-      this.currentAPICall = null;
       throw error; // 重新抛出错误
     }
   }
@@ -224,17 +169,6 @@ export class ChallengeSystem {
       openQuestions: [],
       currentRound: 1
     };
-  }
-
-  /**
-   * 截断提示词以避免恢复点文件过大
-   */
-  private truncatePrompt(prompt: string): string {
-    const maxLength = 1000;
-    if (prompt.length <= maxLength) {
-      return prompt;
-    }
-    return prompt.substring(0, maxLength) + `... [截断，原长度: ${prompt.length}字符]`;
   }
 
   /**
@@ -830,15 +764,15 @@ FOCUS EXCLUSIVELY ON: WHAT INVARIANTS MUST HOLD? WHAT RULES MUST BE FOLLOWED?
     // 2. 如果最近三轮的新发现率持续下降且低于阈值
     if (allRounds.length >= 3) {
       const recentThree = allRounds.slice(-3);
-      const discoveryRates = recentThree.map((round, idx) => {
+      const discoveryRates = recentThree.map((round, _idx) => {
         const prevTotal = allRounds.slice(0, allRounds.indexOf(round)).reduce(
           (sum, r) => sum + r.newDiscoveries, 0
         );
         return prevTotal > 0 ? round.newDiscoveries / prevTotal : 1;
       });
       
-      const isDecreasing = discoveryRates.every((rate, idx) => 
-        idx === 0 || rate <= discoveryRates[idx - 1]
+      const isDecreasing = discoveryRates.every((rate, _idx) => 
+        _idx === 0 || rate <= discoveryRates[_idx - 1]
       );
       const avgRate = discoveryRates.reduce((a, b) => a + b, 0) / discoveryRates.length;
       
@@ -876,7 +810,7 @@ FOCUS EXCLUSIVELY ON: WHAT INVARIANTS MUST HOLD? WHAT RULES MUST BE FOLLOWED?
 
   private getConvergenceReason(
     currentRound: ChallengeRound, 
-    allRounds: ChallengeRound[], 
+    _allRounds: ChallengeRound[], 
     roundNum: number
   ): 'max_rounds' | 'no_new_content' | 'threshold_reached' {
     

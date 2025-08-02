@@ -4,8 +4,7 @@
   "description": "智能合约Invariant和Rule自动发现系统",
   "main": "dist/index.js",
   "bin": {
-    "invariantx": "./dist/cli.js",
-    "invariantx-recovery": "./dist/cli/recovery-cli.js"
+    "invariantx": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

@@ -75,7 +75,7 @@ CRITICAL: FOR EVERY INVARIANT OR RULE YOU FIND, YOU PREVENT HUNDREDS OF MILLIONS
     return challengeResult.finalDiscoveries;
   }
 
-  private buildEnhancedExplorationPrompt(contractCode: string, context: SharedContext): string {
+  private buildEnhancedExplorationPrompt(_contractCode: string, _context: SharedContext): string {
     return `
 PLEASE CONDUCT A COMPREHENSIVE ANALYSIS OF THE SMART CONTRACT FOR ITS INVARIANTS AND RULES.
 
