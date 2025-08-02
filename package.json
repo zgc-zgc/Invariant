@@ -4,7 +4,8 @@
   "description": "智能合约Invariant和Rule自动发现系统",
   "main": "dist/index.js",
   "bin": {
-    "invariantx": "./dist/cli.js"
+    "invariantx": "./dist/cli.js",
+    "invariantx-recovery": "./dist/cli/recovery-cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -25,6 +26,7 @@
   "author": "InvariantX Team",
   "license": "MIT",
   "dependencies": {
+    "axios": "^1.11.0",
     "commander": "^11.1.0",
     "dotenv": "^16.3.1",
     "uuid": "^9.0.1"

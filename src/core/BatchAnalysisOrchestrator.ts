@@ -16,7 +16,7 @@ export class BatchAnalysisOrchestrator {
     this.discoveryOrchestrator = new InvariantDiscoveryOrchestrator();
   }
 
-  public async analyzeBatch(): Promise<void> {
+  public async analyzeBatch(resumeSessionId?: string): Promise<void> {
     this.logger.info('🚀 启动批量分析流程');
     
     // 验证所有材料路径
@@ -43,7 +43,7 @@ export class BatchAnalysisOrchestrator {
     let material: MaterialItem | null;
     while ((material = this.progressManager.getNextMaterial()) !== null) {
       try {
-        await this.analyzeSingleMaterial(material);
+        await this.analyzeSingleMaterial(material, resumeSessionId);
       } catch (error) {
         this.logger.error(`❌ 分析材料 ${material.id} (${material.name}) 时出错: ${error}`);
         
@@ -60,7 +60,7 @@ export class BatchAnalysisOrchestrator {
     this.progressManager.cleanup();
   }
 
-  private async analyzeSingleMaterial(material: MaterialItem): Promise<void> {
+  private async analyzeSingleMaterial(material: MaterialItem, resumeSessionId?: string): Promise<void> {
     this.logger.info(`=== 📋 开始分析材料 ${material.id}: ${material.name} ===`);
     
     this.progressManager.markMaterialStarted(material.id);
@@ -83,7 +83,11 @@ export class BatchAnalysisOrchestrator {
       
       try {
         // 所有内容类型都使用相同的分析路径
-        const result = await this.discoveryOrchestrator.discoverInvariants(content.content);
+        const result = await this.discoveryOrchestrator.discoverInvariants(
+          content.content, 
+          undefined, // 使用默认配置 
+          resumeSessionId
+        );
         
         // 给结果添加来源信息
         result.contract = `${material.name} - ${content.name} (${content.type})`;
@@ -130,8 +134,8 @@ export class BatchAnalysisOrchestrator {
     return this.progressManager.getProgress();
   }
 
-  public async resumeAnalysis(): Promise<void> {
+  public async resumeAnalysis(resumeSessionId?: string): Promise<void> {
     this.logger.info('恢复中断的分析...');
-    await this.analyzeBatch();
+    await this.analyzeBatch(resumeSessionId);
   }
 }

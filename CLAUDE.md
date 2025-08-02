@@ -36,10 +36,10 @@ npm run lint
 # Clean build directory
 npm run clean
 
-# Test the CLI
-npx invariantx discover ./examples/SimpleToken.sol --verbose
-npx invariantx config --check
-npx invariantx config --init
+# Test the simplified CLI
+npx invariantx ./examples/SimpleToken.sol
+npx invariantx --log-ai
+npx invariantx --new ./examples/SimpleToken.sol
 ```
 
 ## Core Architecture
@@ -79,6 +79,19 @@ npx invariantx config --init
 - Supports any LLM provider via environment configuration
 - Robust retry logic with exponential backoff and 429 handling
 - No hardcoded temperature/max_tokens - lets APIs use their defaults
+- Dual API support: fetch with axios fallback for maximum reliability
+
+**Session Management System** (`src/core/`):
+- `HybridSessionManager`: Intelligent memory + persistence hybrid strategy
+- `SessionDetector`: Multi-dimensional confidence scoring for automatic session recovery
+- Step-level interrupt recovery with recovery points at every critical operation
+- Automatic session detection and resumption without manual --resume flags
+
+**Enhanced CLI Features**:
+- Intelligent session detection: automatically detects and resumes interrupted sessions
+- Auto-config reading: when no file specified, reads contracts from materials-config.json
+- Multi-dimensional confidence scoring (time, file matching, progress, data integrity)
+- User-friendly recovery prompts with detailed session information
 
 ### Configuration Architecture
 

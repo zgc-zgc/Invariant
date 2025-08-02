@@ -1,0 +1,30 @@
+{
+  "sessionId": "test_session_1754038140019",
+  "phase": "explorer",
+  "subPhase": "initialization",
+  "currentRound": 1,
+  "maxRounds": 10,
+  "context": {
+    "contractCode": "contract SimpleToken { mapping(address => uint256) public balances; }",
+    "contractName": "SimpleToken",
+    "discussionHistory": [],
+    "discoveredInvariants": [],
+    "openQuestions": [],
+    "currentRound": 1
+  },
+  "intermediateResults": [],
+  "timestamp": 1754038213663,
+  "executionState": {
+    "lastCompletedStep": "initialization",
+    "nextStep": "explorer_start",
+    "stepProgress": 0.5,
+    "totalSteps": 7
+  },
+  "metadata": {
+    "totalExecutionTime": 0,
+    "apiCallCount": 0,
+    "errorCount": 0,
+    "lastSavedAt": 1754038213663,
+    "dataSize": 204
+  }
+}

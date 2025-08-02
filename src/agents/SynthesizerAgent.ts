@@ -79,7 +79,7 @@ Output format:
 }
 `;
     
-    const response = await this.callAI(prompt);
+    const response = await this.callAI(prompt, null as any);
     return this.parseCoreInvariants(response);
   }
   
@@ -141,7 +141,7 @@ Output format:
 }
 `;
     
-    const response = await this.callAI(prompt);
+    const response = await this.callAI(prompt, null as any);
     return this.parseFinalResult(response);
   }
   

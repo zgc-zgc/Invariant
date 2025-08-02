@@ -1,5 +1,7 @@
 import { APIManager } from '../api/APIManager';
-import { AgentMessage, ChallengeRound, ChallengeResult, ConvergenceConfig } from '../types';
+import { AgentMessage, ChallengeRound, ChallengeResult, ConvergenceConfig, SharedContext } from '../types';
+import { ExecutionSnapshot } from '../types/SessionTypes';
+import { SimpleSessionManager } from './SimpleSessionManager';
 import { v4 as uuidv4 } from 'uuid';
 import { ProgressDisplay } from '../utils/ProgressDisplay';
 import { createLogger } from '../utils/Logger';
@@ -8,19 +10,253 @@ export class ChallengeSystem {
   private apiManager: APIManager;
   private convergenceConfig: ConvergenceConfig;
   private progressDisplay: ProgressDisplay;
+  private sessionManager: SimpleSessionManager;
   private logger = createLogger('ChallengeSystem');
+  private currentSessionId: string | null = null;
+  private lastFailureTimestamp: number = 0;
+  private readonly FAILURE_COOLDOWN = 5000; // 5秒内的连续失败只创建一次恢复点
+  
+  // 添加当前API调用状态跟踪
+  private currentAPICall: {
+    prompt: string;
+    agentRole: 'Explorer' | 'Deepener';
+    context: any;
+    startTime: number;
+  } | null = null;
 
   constructor(apiManager: APIManager, convergenceConfig: ConvergenceConfig) {
     this.apiManager = apiManager;
     this.convergenceConfig = convergenceConfig;
     this.progressDisplay = new ProgressDisplay();
+    this.sessionManager = SimpleSessionManager.getInstance();
+    
+    // 不再注册进程中断处理器，因为手动中断不需要恢复点
+    // this.setupInterruptHandler();
   }
 
+  /**
+   * 设置进程中断处理器 - 已废弃，手动中断不创建恢复点
+   */
+  /*
+    const interruptHandler = async () => {
+      if (this.currentAPICall && this.currentSessionId) {
+        this.logger.warn('🛑 检测到进程中断，尝试创建恢复点...');
+        
+        try {
+          const error = new Error('进程被用户中断（Ctrl+C）');
+          await this.createRecoveryPointOnFailure(
+            this.currentAPICall.prompt,
+            this.currentAPICall.agentRole,
+            this.currentAPICall.context,
+            error
+          );
+          this.logger.info('✅ 中断恢复点已创建');
+        } catch (error) {
+          this.logger.error(`❌ 创建中断恢复点失败: ${(error as Error).message}`);
+        }
+      }
+      
+      // 优雅退出
+      process.exit(0);
+    };
+    
+    // 注册中断处理器（只注册一次）
+    process.once('SIGINT', interruptHandler);
+    process.once('SIGTERM', interruptHandler);
+  }
+  */
+
+  /**
+   * 设置当前会话ID，用于创建恢复点
+   */
+  setCurrentSession(sessionId: string): void {
+    this.currentSessionId = sessionId;
+  }
+
+  /**
+   * 安全的API调用包装，失败时创建恢复点
+   */
+  private async safeCallAPI(prompt: string, agentRole: 'Explorer' | 'Deepener', context?: any): Promise<string> {
+    this.logger.debug(`🔍 safeCallAPI: 准备调用API (Agent: ${agentRole}, SessionID: ${this.currentSessionId})`);
+    
+    // 记录当前API调用状态，用于中断时创建恢复点
+    this.currentAPICall = {
+      prompt,
+      agentRole,
+      context,
+      startTime: Date.now()
+    };
+    
+    try {
+      const response = await this.apiManager.callAPI(prompt, agentRole);
+      this.logger.debug(`✅ safeCallAPI: API调用成功 (Agent: ${agentRole})`);
+      
+      // 清理当前API调用状态
+      this.currentAPICall = null;
+      return response;
+    } catch (error) {
+      this.logger.warn(`🚨 safeCallAPI: API调用失败 (Agent: ${agentRole}): ${(error as Error).message}`);
+      
+      // 在API失败时创建恢复点
+      try {
+        await this.createRecoveryPointOnFailure(prompt, agentRole, context, error as Error);
+        this.logger.info(`🔄 safeCallAPI: 恢复点创建完成 (Agent: ${agentRole})`);
+      } catch (recoveryError) {
+        this.logger.error(`❌ safeCallAPI: 恢复点创建失败: ${(recoveryError as Error).message}`);
+      }
+      
+      // 清理当前API调用状态
+      this.currentAPICall = null;
+      throw error; // 重新抛出错误
+    }
+  }
+
+  /**
+   * API调用失败时创建恢复点
+   */
+  private async createRecoveryPointOnFailure(
+    failedPrompt: string, 
+    agentRole: 'Explorer' | 'Deepener', 
+    context?: any, 
+    error?: Error
+  ): Promise<void> {
+    this.logger.debug(`🔍 createRecoveryPointOnFailure: 准备创建恢复点 (Agent: ${agentRole}, SessionID: ${this.currentSessionId})`);
+    
+    if (!this.currentSessionId) {
+      this.logger.warn('❌ createRecoveryPointOnFailure: 没有会话ID，跳过恢复点创建');
+      return;
+    }
+
+    const now = Date.now();
+    
+    // 防止连续失败时重复创建恢复点
+    if (now - this.lastFailureTimestamp < this.FAILURE_COOLDOWN) {
+      this.logger.debug(`⏭️ createRecoveryPointOnFailure: 连续API失败，跳过恢复点创建 (冷却时间: ${this.FAILURE_COOLDOWN}ms)`);
+      return;
+    }
+
+    try {
+      this.logger.debug(`📝 createRecoveryPointOnFailure: 构建执行快照 (Phase: ${agentRole === 'Explorer' ? 'explorer' : 'deepener'})`);
+      
+      // 从上下文中提取完整信息
+      const fullContext = context || this.createEmptyContext();
+      
+      // 创建完整的执行快照，包含所有恢复所需信息
+      const snapshot: ExecutionSnapshot = {
+        sessionId: this.currentSessionId,
+        phase: agentRole === 'Explorer' ? 'explorer' : 'deepener',
+        subPhase: `${agentRole.toLowerCase()}_api_failure`,
+        currentRound: fullContext.currentRound || 1,
+        maxRounds: this.convergenceConfig.maxChallengeRounds || 10,
+        context: fullContext,
+        intermediateResults: fullContext.discoveredInvariants || [],
+        timestamp: now,
+        
+        executionState: {
+          lastCompletedStep: `${agentRole}_before_api_call`,
+          nextStep: `${agentRole}_retry_api_call`,
+          stepProgress: this.calculateCurrentProgress(agentRole),
+          totalSteps: 7,
+          lastAPICall: {
+            agent: agentRole,
+            prompt: failedPrompt, // 保存完整prompt以便重试
+            timestamp: now,
+            status: 'failed',
+            retryCount: 0
+          }
+        },
+        
+        metadata: {
+          totalExecutionTime: now - (fullContext.startTime || now),
+          apiCallCount: fullContext.apiCallCount || 1,
+          errorCount: (fullContext.errorCount || 0) + 1,
+          lastSavedAt: now,
+          dataSize: JSON.stringify(fullContext).length + failedPrompt.length,
+          error: error?.message || 'Unknown API error'
+        },
+        
+        // 添加恢复运行所需的额外信息
+        recoveryData: {
+          contractCode: fullContext.contractCode || '',
+          contractName: fullContext.contractName || 'Unknown',
+          configPath: fullContext.configPath || './configs/default-config.json',
+          materialId: fullContext.materialId || null,
+          batchConfigPath: fullContext.batchConfigPath || null,
+          
+          // 保存已完成的分析结果
+          explorerFindings: fullContext.explorerFindings || null,
+          deepenerProgress: fullContext.deepenerProgress || null,
+          
+          // 保存当前阶段的中间结果
+          currentPhaseData: {
+            roundHistory: fullContext.roundHistory || [],
+            alphaMessage: fullContext.alphaMessage || null,
+            betaMessage: fullContext.betaMessage || null,
+            supplementaryPrompts: fullContext.supplementaryPrompts || []
+          }
+        }
+      };
+
+      this.logger.debug(`💾 createRecoveryPointOnFailure: 保存恢复点到SessionManager`);
+      await this.sessionManager.createRecoveryPoint(snapshot);
+      this.lastFailureTimestamp = now;
+      
+      this.logger.info(`🔄 API失败恢复点已创建 (${agentRole}阶段)`);
+      this.logger.info(`📊 恢复点详情: Phase=${snapshot.phase}, SubPhase=${snapshot.subPhase}, ErrorCount=${snapshot.metadata.errorCount}`);
+      this.logger.debug(`💬 失败原因: ${error?.message || 'Unknown error'}`);
+      
+    } catch (recoveryError) {
+      this.logger.error(`❌ createRecoveryPointOnFailure: 创建API失败恢复点时出错: ${(recoveryError as Error).message}`);
+      this.logger.error(`🔍 恢复错误详情: ${(recoveryError as Error).stack}`);
+      throw recoveryError; // 重新抛出恢复错误以便上层捕获
+    }
+  }
+
+  /**
+   * 创建空的上下文（当没有传递context时使用）
+   */
+  private createEmptyContext(): SharedContext {
+    return {
+      contractCode: '',
+      contractName: 'Unknown',
+      discussionHistory: [],
+      discoveredInvariants: [],
+      openQuestions: [],
+      currentRound: 1
+    };
+  }
+
+  /**
+   * 截断提示词以避免恢复点文件过大
+   */
+  private truncatePrompt(prompt: string): string {
+    const maxLength = 1000;
+    if (prompt.length <= maxLength) {
+      return prompt;
+    }
+    return prompt.substring(0, maxLength) + `... [截断，原长度: ${prompt.length}字符]`;
+  }
+
+  /**
+   * 计算当前进度
+   */
+  private calculateCurrentProgress(agentRole: 'Explorer' | 'Deepener'): number {
+    switch (agentRole) {
+      case 'Explorer': return 0.3;
+      case 'Deepener': return 0.6;
+      default: return 0.5;
+    }
+  }
+
+  /**
+   * 执行挑战分析，包含完整的上下文信息
+   */
   async conductChallenge(
     agentType: 'Explorer' | 'Deepener',
     initialPrompt: string,
     contractCode: string,
-    supplementaryPrompts: string[] = []
+    supplementaryPrompts: string[] = [],
+    existingContext?: any // 可以传入已有的上下文
   ): Promise<ChallengeResult> {
     
     this.logger.info(`🎯 启动 ${agentType} 对抗分析模式`);
@@ -28,22 +264,36 @@ export class ChallengeSystem {
     const rounds: ChallengeRound[] = [];
     let previousDiscoveries = new Set<string>();
     
+    // 构建完整的上下文
+    const fullContext = {
+      ...existingContext,
+      contractCode,
+      contractName: existingContext?.contractName || 'Unknown',
+      agentType,
+      supplementaryPrompts,
+      roundHistory: [],
+      currentRound: 0,
+      startTime: Date.now()
+    };
+    
     // 第一轮：Alpha开始
+    fullContext.currentRound = 0;
     this.logger.info(`[轮次 0] ${agentType} Alpha 开始深度探索`);
-    let alphaMessage = await this.callAlphaRole(agentType, initialPrompt, contractCode, supplementaryPrompts);
+    let alphaMessage = await this.callAlphaRole(agentType, initialPrompt, contractCode, supplementaryPrompts, fullContext);
     this.logger.info(`[轮次 0] ${agentType} Alpha 完成初始发现`);
     
     for (let roundNum = 1; roundNum <= this.convergenceConfig.maxChallengeRounds; roundNum++) {
+      fullContext.currentRound = roundNum;
       this.logger.info(`🔄 第 ${roundNum} 轮对抗开始`);
       
       // Beta 挑战 Alpha
       this.logger.info(`[轮次 ${roundNum}] ${agentType} Beta 发起挑战质疑`);
-      const betaMessage = await this.callBetaRole(agentType, alphaMessage, contractCode, supplementaryPrompts);
+      const betaMessage = await this.callBetaRole(agentType, alphaMessage, contractCode, supplementaryPrompts, fullContext);
       this.logger.info(`[轮次 ${roundNum}] ${agentType} Beta 完成挑战分析`);
       
       // Alpha 回应 Beta
       this.logger.info(`[轮次 ${roundNum}] ${agentType} Alpha 回应并补强论证`);
-      alphaMessage = await this.callAlphaRole(agentType, this.buildChallengePrompt(alphaMessage, betaMessage), contractCode, supplementaryPrompts);
+      alphaMessage = await this.callAlphaRole(agentType, this.buildChallengePrompt(alphaMessage, betaMessage), contractCode, supplementaryPrompts, fullContext);
       this.logger.info(`[轮次 ${roundNum}] ${agentType} Alpha 完成回应强化`);
       
       // 计算新发现数量
@@ -112,7 +362,8 @@ export class ChallengeSystem {
     agentType: 'Explorer' | 'Deepener',
     prompt: string,
     contractCode: string,
-    supplementaryPrompts: string[]
+    supplementaryPrompts: string[],
+    context?: any
   ): Promise<AgentMessage> {
     
     const systemPrompt = this.buildAlphaSystemPrompt(agentType);
@@ -141,7 +392,7 @@ YOUR RESPONSE MUST CONTAIN ONLY: INVARIANTS, RULES, CONTRACT CONSTRAINTS, STATE 
       const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${prompt}\n\n${this.formatSupplementaryPrompts(supplementaryPrompts)}${antiSecuritySuffix}`;
       
       this.logger.debug(`向 ${agentType} Alpha 发送API请求...`);
-      const response = await this.apiManager.callAPI(fullPrompt);
+      const response = await this.safeCallAPI(fullPrompt, agentType, context);
       this.logger.debug(`${agentType} Alpha API调用完成`);
       
       return {
@@ -160,7 +411,7 @@ YOUR RESPONSE MUST CONTAIN ONLY: INVARIANTS, RULES, CONTRACT CONSTRAINTS, STATE 
       const fullPrompt = `${systemPrompt}\n\nCONTRACT CODE:\n\`\`\`solidity\n${contractCode}\n\`\`\`\n\n${prompt}`;
       
       this.logger.debug(`向 ${agentType} Alpha 发送API请求...`);
-      const response = await this.apiManager.callAPI(fullPrompt);
+      const response = await this.safeCallAPI(fullPrompt, agentType, context);
       this.logger.debug(`${agentType} Alpha API调用完成`);
       
       return {
@@ -181,7 +432,8 @@ YOUR RESPONSE MUST CONTAIN ONLY: INVARIANTS, RULES, CONTRACT CONSTRAINTS, STATE 
     agentType: 'Explorer' | 'Deepener',
     alphaMessage: AgentMessage,
     contractCode: string,
-    supplementaryPrompts: string[]
+    supplementaryPrompts: string[],
+    context?: any
   ): Promise<AgentMessage> {
     
     const systemPrompt = this.buildBetaSystemPrompt(agentType);
@@ -215,7 +467,7 @@ CHALLENGE ALPHA'S INVARIANT/RULE DISCOVERY, NOT THEIR SECURITY AWARENESS.`;
       
       this.logger.debug(`向 ${agentType} Beta 发送API请求...`);
       const fullPrompt = `${systemPrompt}\n\nCODE：\n\`\`\`solidity\n${contractCode}\n\`\`\`\n${challengePrompt}${antiSecuritySuffix}`;
-      const response = await this.apiManager.callAPI(fullPrompt);
+      const response = await this.safeCallAPI(fullPrompt, agentType, context);
       this.logger.debug(`${agentType} Beta API调用完成`);
       
       return {
@@ -243,7 +495,7 @@ Please apply your precondition auditing framework to identify flaws in Alpha's a
       
       this.logger.debug(`向 ${agentType} Beta 发送API请求...`);
       const fullPrompt = `${systemPrompt}\n\n${challengePrompt}`;
-      const response = await this.apiManager.callAPI(fullPrompt);
+      const response = await this.safeCallAPI(fullPrompt, agentType, context);
       this.logger.debug(`${agentType} Beta API调用完成`);
       
       return {

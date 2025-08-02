@@ -1,0 +1,30 @@
+{
+  "sessionId": "session_1754036619250_iuz96wi11",
+  "phase": "explorer",
+  "subPhase": "initialization",
+  "currentRound": 1,
+  "maxRounds": 10,
+  "context": {
+    "contractCode": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract SimpleToken {\n    string public name = \"SimpleToken\";\n    string public symbol = \"ST\";\n    uint256 public totalSupply;\n    \n    mapping(address => uint256) public balanceOf;\n    mapping(address => mapping(address => uint256)) public allowance;\n    \n    address public owner;\n    bool public paused = false;\n    \n    event Transfer(address indexed from, address indexed to, uint256 value);\n    event Approval(address indexed owner, address indexed spender, uint256 value);\n    event Mint(address indexed to, uint256 value);\n    \n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Not owner\");\n        _;\n    }\n    \n    modifier whenNotPaused() {\n        require(!paused, \"Contract is paused\");\n        _;\n    }\n    \n    constructor(uint256 _initialSupply) {\n        owner = msg.sender;\n        totalSupply = _initialSupply;\n        balanceOf[msg.sender] = _initialSupply;\n    }\n    \n    function transfer(address to, uint256 amount) public whenNotPaused returns (bool) {\n        require(balanceOf[msg.sender] >= amount, \"Insufficient balance\");\n        require(to != address(0), \"Cannot transfer to zero address\");\n        \n        balanceOf[msg.sender] -= amount;\n        balanceOf[to] += amount;\n        \n        emit Transfer(msg.sender, to, amount);\n        return true;\n    }\n    \n    function approve(address spender, uint256 amount) public returns (bool) {\n        allowance[msg.sender][spender] = amount;\n        emit Approval(msg.sender, spender, amount);\n        return true;\n    }\n    \n    function transferFrom(address from, address to, uint256 amount) public whenNotPaused returns (bool) {\n        require(balanceOf[from] >= amount, \"Insufficient balance\");\n        require(allowance[from][msg.sender] >= amount, \"Insufficient allowance\");\n        require(to != address(0), \"Cannot transfer to zero address\");\n        \n        balanceOf[from] -= amount;\n        balanceOf[to] += amount;\n        allowance[from][msg.sender] -= amount;\n        \n        emit Transfer(from, to, amount);\n        return true;\n    }\n    \n    function mint(address to, uint256 amount) public onlyOwner {\n        require(to != address(0), \"Cannot mint to zero address\");\n        \n        totalSupply += amount;\n        balanceOf[to] += amount;\n        \n        emit Mint(to, amount);\n        emit Transfer(address(0), to, amount);\n    }\n    \n    function pause() public onlyOwner {\n        paused = true;\n    }\n    \n    function unpause() public onlyOwner {\n        paused = false;\n    }\n}",
+    "contractName": "AnalyzedContract",
+    "discussionHistory": [],
+    "discoveredInvariants": [],
+    "openQuestions": [],
+    "currentRound": 1
+  },
+  "intermediateResults": [],
+  "timestamp": 1754036619250,
+  "executionState": {
+    "lastCompletedStep": "initialization",
+    "nextStep": "explorer_start",
+    "stepProgress": 0.5,
+    "totalSteps": 7
+  },
+  "metadata": {
+    "totalExecutionTime": 0,
+    "apiCallCount": 0,
+    "errorCount": 0,
+    "lastSavedAt": 1754036619250,
+    "dataSize": 2798
+  }
+}

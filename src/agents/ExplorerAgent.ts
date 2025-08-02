@@ -12,6 +12,15 @@ export class ExplorerAgent extends BaseAgent {
     const configManager = ConfigManager.getInstance();
     this.challengeSystem = new ChallengeSystem(apiManager, configManager.getConvergenceConfig());
   }
+
+  /**
+   * 设置当前会话ID
+   */
+  setCurrentSession(sessionId: string): void {
+    super.setCurrentSession(sessionId);
+    // 同时设置ChallengeSystem的会话ID
+    this.challengeSystem.setCurrentSession(sessionId);
+  }
   
   protected getSpecificInstructions(): string {
     const explorerBrain = `🎯 EXPLORER BRAIN PERSONALITY 🎯

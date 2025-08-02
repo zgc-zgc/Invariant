@@ -1,60 +1,310 @@
 # InvariantX
 
-智能合约Invariant和Rule自动发现系统
+智能合约不变量和规则自动发现系统
 
 ## 项目概述
 
 InvariantX是一个将刚性程序控制与AI智能分析相结合的系统，专门用于自动发现Solidity智能合约中的不变量(invariant)和规则(rule)。核心原理是程序作为会议主持人，而AI代理进行深度讨论，自主发现不变量。
 
-**重要说明：这不是漏洞扫描器或攻击工具，而是专注于理解合约约束本质的不变量发现系统。**
+**重要说明：这不是漏洞扫描器或攻击工具，而是专注于理解合约约束本质的不变量发现系统 - "永远为真的属性"和"必须遵守的规则"。**
 
-## 🚀 最新优化 (2025-01-29)
+## 🚀 最新修复 (2025-08-01)
 
-### 1. **智能收敛策略**
-- **增强的收敛分数计算**：基于长度比率(30%)、词汇重叠(50%)、关键概念相似度(20%)的综合评分
-- **多维度收敛判断**：
-  - 连续无新发现自动停止
-  - 新发现率持续下降检测
-  - 收敛分数阈值动态判断
-  - 智能早停机制（达到60%轮数后评估）
+### 🎯 恢复机制增强
+- **API超时中断恢复**：API调用超时重试期间按Ctrl+C中断时，系统自动创建恢复点
+- **进程中断处理**：新增进程中断处理器，确保任何中断都能保存当前状态
+- **恢复点精确性**：恢复点包含完整的执行上下文，包括失败的提示词、代理角色、会话ID等信息
 
-### 2. **结构化进度显示**
-- **实时Challenge进度条**：显示当前轮次、新发现数量、收敛分数
-- **收敛分析可视化**：实时展示各维度收敛指标
-- **美观的ASCII界面**：清晰的进度展示和统计信息
+### 🔧 命令行修复
+- **--new 参数增强**：使用 `--new` 时现在会同时清理进度状态文件和恢复点文件
+- **状态一致性**：解决了 `--new` 参数仍显示"从中断处继续"的矛盾问题
+- **简化命令**：统一为单一命令接口，自动处理批量和单文件分析
 
-### 3. **断点恢复机制**
-- **自动保存分析状态**：支持从中断处继续
-- **材料级别的进度追踪**：记录每个分析材料的完成状态
-- **智能恢复**：自动识别未完成的任务并继续
+## 📋 快速开始
 
-### 4. **统一和可配置的日志系统**
-- **结构化日志**：所有日志输出已统一为 `[时间戳] [级别] [模块] 消息` 格式，提高了可读性。
-- **分级日志系统**：
-  - **`INFO` 级别**：默认显示，只包含关键操作步骤，如阶段开始/结束、API调用等，使流程清晰明了。
-  - **`DEBUG` 级别**：通过 `--verbose` 标志启用，提供详细的内部信息，如收敛计算、API提示预览等，便于深度调试。
-- **日志文件**：所有日志会自动保存到 `./logs/` 目录下的文件中，便于事后分析。
+### 基本使用
+```bash
+# 安装依赖
+npm install
 
-## 系统架构
+# 编译项目
+npm run build
 
-### 3个核心AI代理 + Alpha-Beta挑战系统
-- **Explorer（探索者）**: 通过Alpha-Beta角色互相挑战，全面发现不变量和规则（已整合ValueAssessor功能）
+# 自动分析（从配置文件读取）
+npx invariantx
+
+# 分析单个合约文件
+npx invariantx ./examples/SimpleToken.sol
+
+# 开始全新分析（清理所有状态）
+npx invariantx --new
+
+# 启用AI通信日志记录
+npx invariantx --log-ai
+```
+
+### 环境配置
+创建 `.env` 文件：
+```env
+# API配置 (支持任何LLM API)
+API_ENDPOINT=https://tbai.xin/v1/chat/completions
+API_KEY=your-api-key
+MODEL_NAME=claude-3-sonnet-20240229
+
+# 错误处理
+RETRY_ENABLED=true
+MAX_RETRIES=10
+RETRY_DELAY_MS=1000
+HANDLE_429=true
+
+# 挑战系统配置
+MAX_CHALLENGE_ROUNDS=5
+CHALLENGE_CONVERGENCE_THRESHOLD=0.75
+```
+
+## 🔄 恢复机制详解
+
+### 恢复点创建时机
+1. **API调用最终失败**：所有重试都失败后自动创建
+2. **用户手动中断**：按Ctrl+C时自动创建恢复点（新增）
+3. **进程异常终止**：系统崩溃时创建恢复点
+
+### 恢复操作
+```bash
+# 系统自动检测恢复点
+npx invariantx
+# 输出示例：
+[INFO] ⚠️  检测到API失败恢复点:
+[INFO] 失败阶段: deepener - Deepener代理
+[INFO] 会话ID: session_1754042984362
+[INFO] 错误次数: 1
+[INFO] 🔄 系统将从API失败处重试
+```
+
+### 恢复点文件位置
+- 恢复点：`.invariantx/recovery/latest.recovery.json`
+- 批量进度：`materials-config.state.json`
+- 日志文件：`./logs/invariantx-YYYY-MM-DD.log`
+
+## 🏗️ 系统架构
+
+### 核心AI代理
+- **Explorer（探索者）**: 通过Alpha-Beta角色互相挑战，全面发现不变量和规则
 - **Deepener（深化者）**: 通过Alpha-Beta角色互相挑战，深化理解并发现隐藏关联
 - **Synthesizer（综合者）**: 组织和整理最终结果，识别核心不变量
 
 ### Alpha-Beta挑战工作流
-1. **Explorer挑战阶段**：Explorer的Alpha-Beta角色互相挑战，全面发现不变量并评估重要性
-2. **核心识别**：Synthesizer从挑战结果中识别3-5个最关键的不变量
-3. **Deepener挑战阶段**：基于核心不变量，Deepener的Alpha-Beta角色互相挑战，分析关系并派生新约束
-4. **最终综合**：Synthesizer整合所有发现形成最终结果
+1. **Explorer挑战阶段**：Alpha-Beta角色互相挑战，全面发现不变量
+2. **核心识别**：Synthesizer识别3-5个最关键的不变量
+3. **Deepener挑战阶段**：基于核心不变量进行深度关系分析
+4. **最终综合**：整合所有发现形成最终结果
 
 ### 技术栈
 - **框架**: TypeScript + Node.js
-- **AI接口**: 支持通过环境变量配置的任何LLM API
-- **错误处理**: 自动重试、429处理、指数退避
-- **配置**: 环境变量驱动 + 动态JSON配置
+- **AI接口**: 支持任何LLM API（通过环境变量配置）
+- **错误处理**: 自动重试、429处理、指数退避、进程中断恢复
+- **日志系统**: 结构化日志，自动文件保存
 
-## 安装与配置
+## 📁 材料配置
+
+### 批量分析配置文件 (materials-config.json)
+```json
+{
+  "projectName": "项目名称",
+  "description": "项目描述", 
+  "materials": [
+    {
+      "id": "001",
+      "type": "contract",
+      "name": "主合约",
+      "path": "./contracts/Main.sol",
+      "priority": "high",
+      "completed": false
+    }
+  ],
+  "outputPath": "./results/analysis-results.json",
+  "resumeFrom": null,
+  "lastUpdated": null
+}
+```
+
+### 支持的材料类型
+- **contract**: Solidity智能合约文件
+- **document**: 技术文档和白皮书
+- **folder**: 合约目录（批量处理）
+
+## 🎯 核心概念
+
+### 什么是Invariant（不变量）？
+合约在任何状态下都必须为真的属性：
+- "代币总供应量 = 所有用户余额之和"
+- "锁定的代币数量 ≤ 总供应量"
+- "在AMM中，配对代币储备的乘积保持恒定 (X * Y = K)"
+
+### 什么是Rule（规则）？
+合约必须遵守的业务逻辑规则：
+- "只有合约所有者可以调用管理功能"
+- "只有在解锁时间后才能提取资金"
+- "治理提案只能由持有最低数量治理代币的用户创建"
+
+### Alpha-Beta挑战机制
+- **Alpha角色**：提出初始发现和分析
+- **Beta角色**：挑战、补充、深化Alpha的发现
+- **收敛机制**：通过智能判断避免无限循环
+
+## 📊 输出格式
+
+```json
+{
+  "contract": "合约名称",
+  "discoveredInvariants": [
+    {
+      "description": "永远为真的属性描述",
+      "type": "数学关系|状态约束|访问控制|时间约束",
+      "importance": "关键|重要|一般",
+      "relatedFunctions": ["transfer", "mint", "burn"],
+      "confidence": 0.95,
+      "source": "Explorer-Alpha|Explorer-Beta|Deepener"
+    }
+  ],
+  "discussionSummary": {
+    "explorerChallengeRounds": 4,
+    "deepenerChallengeRounds": 3,
+    "totalInvariantsFound": 25,
+    "coreInvariantsIdentified": 5,
+    "convergenceAchieved": true
+  },
+  "metadata": {
+    "executionTime": 45000,
+    "timestamp": "2025-08-01T12:00:00Z",
+    "modelUsed": "claude-3-sonnet"
+  }
+}
+```
+
+## 🛠️ 故障排除
+
+### 恢复机制问题 🔄
+1. **中断后没有恢复点**: 确保在API调用期间中断，而不是在输出阶段
+2. **--new 仍显示继续**: 升级到最新版本，已修复状态文件清理问题
+3. **恢复点检测失败**: 检查 `.invariantx/recovery/` 目录权限
+4. **恢复状态不正确**: 确保API配置与中断时一致
+
+### 调试命令
+```bash
+# 启用详细日志查看恢复过程
+LOG_LEVEL=DEBUG npx invariantx
+
+# 手动检查恢复点文件
+cat .invariantx/recovery/latest.recovery.json | jq .
+
+# 查看批量分析进度
+cat configs/materials-config.state.json | jq .
+
+# 运行恢复诊断工具
+node diagnostic-recovery.js
+```
+
+### 常见问题
+1. **API调用失败**: 检查API_KEY和API_ENDPOINT配置
+2. **429错误**: 系统会自动重试，可调整RETRY_DELAY_MS
+3. **分析时间过长**: 减少MAX_CHALLENGE_ROUNDS值
+4. **进程意外终止**: 检查 `./logs/` 目录下的日志文件
+
+## 📂 项目结构
+
+```
+src/
+├── agents/          # 3个AI代理实现
+│   ├── BaseAgent.ts
+│   ├── ExplorerAgent.ts
+│   ├── DeepenerAgent.ts
+│   └── SynthesizerAgent.ts
+├── api/             # API管理和错误处理
+│   └── APIManager.ts
+├── config/          # 配置管理
+│   ├── ConfigManager.ts
+│   └── DynamicConfigLoader.ts
+├── core/            # 核心编排器和系统
+│   ├── InvariantDiscoveryOrchestrator.ts
+│   ├── ChallengeSystem.ts           # Alpha-Beta挑战实现
+│   ├── BatchAnalysisOrchestrator.ts
+│   ├── SimpleSessionManager.ts     # 恢复点管理
+│   └── ProgressManager.ts          # 批量分析进度
+├── utils/           # 工具函数
+│   ├── Logger.ts                   # 统一日志系统
+│   ├── AICommunicationLogger.ts    # AI通信记录
+│   └── ProgressDisplay.ts          # 进度显示
+├── types/           # TypeScript类型定义
+└── cli.ts           # 命令行入口
+```
+
+## 📚 版本历史
+
+### v1.2.0 (2025-08-01) - 恢复机制增强版
+- **🎯 恢复机制重大增强**：
+  - 新增进程中断时自动创建恢复点
+  - 修复API超时重试期间中断不创建恢复点的问题
+  - 增强恢复点内容，包含完整执行上下文
+- **🔧 命令行修复**：
+  - 修复 `--new` 参数没有完全清理状态的问题
+  - 统一命令行接口，简化用户操作
+- **📊 调试工具**：
+  - 新增恢复机制诊断工具
+  - 增强日志系统，便于故障排查
+
+### v1.1.0 (2025-01-29) - 智能收敛优化版
+- **智能收敛策略**：多维度收敛判断，避免无效循环
+- **进度显示优化**：实时Challenge进度条和收敛分析
+- **断点恢复机制**：材料级别的进度追踪
+- **统一日志系统**：结构化的分级日志
+
+### v1.0.0 - 初始版本
+- Alpha-Beta挑战式不变量发现系统
+- 3个核心AI代理架构
+- 动态配置支持
+- 基础API错误处理
+
+## 🎯 使用示例
+
+### 示例1：分析示例代币合约
+```bash
+npx invariantx ./examples/SimpleToken.sol
+```
+
+### 示例2：批量分析项目
+```bash
+# 编辑 configs/materials-config.json 添加你的合约
+npx invariantx
+```
+
+### 示例3：从中断处恢复
+```bash
+# 如果之前分析被中断，系统会自动提示恢复
+npx invariantx
+```
+
+## ⚙️ 性能优化
+
+1. **调整收敛阈值**：通过 `CHALLENGE_CONVERGENCE_THRESHOLD` 控制收敛敏感度
+2. **限制挑战轮数**：通过 `MAX_CHALLENGE_ROUNDS` 避免过度分析
+3. **批量分析优化**：使用材料配置文件进行批量处理
+4. **断点恢复**：长时间分析任务支持中断后继续
+
+## 📝 许可证
+
+MIT License
+
+## 🤝 贡献指南
+
+1. 本项目专注于不变量发现，不接受与安全攻击相关的贡献
+2. 欢迎提交新的探索策略和分析维度
+3. 代码提交前请运行 `npm run lint`
+4. 保持AI代理的独立性和模块化
+
+## 📞 联系方式
+
+如有问题或建议，请提交Issue。
 
 ### 1. 安装依赖
 ```bash
@@ -314,6 +564,27 @@ src/
 
 ## 故障排除
 
+### 恢复机制问题 🔄
+1. **中断后没有恢复点**: 确保在API调用期间中断，而不是在输出阶段
+2. **--new 仍显示继续**: 升级到最新版本，已修复状态文件清理问题
+3. **恢复点检测失败**: 检查 `.invariantx/recovery/` 目录权限
+4. **恢复状态不正确**: 确保API配置与中断时一致
+
+### 恢复机制调试
+```bash
+# 启用详细日志查看恢复过程
+LOG_LEVEL=DEBUG npx invariantx
+
+# 手动检查恢复点文件
+cat .invariantx/recovery/latest.recovery.json | jq .
+
+# 测试中断恢复机制
+node test-interrupt-recovery.js
+
+# 运行恢复诊断工具
+node diagnostic-recovery.js
+```
+
 ### 常见问题
 1. **API调用失败**: 检查API_KEY和API_ENDPOINT配置
 2. **429错误**: 系统会自动重试，可调整RETRY_DELAY_MS
@@ -330,6 +601,33 @@ src/
 ## 示例
 
 查看 `examples/SimpleToken.sol` 获取示例智能合约。
+
+## 📚 版本历史
+
+### v1.2.0 (2025-08-01) - 恢复机制增强版
+- **🎯 恢复机制重大增强**：
+  - 新增进程中断时自动创建恢复点
+  - 修复API超时重试期间中断不创建恢复点的问题
+  - 增强恢复点内容，包含完整执行上下文
+- **🔧 命令行修复**：
+  - 修复 `--new` 参数没有完全清理状态的问题
+  - 解决批量分析状态文件清理问题
+- **📊 调试工具**：
+  - 新增恢复机制诊断工具
+  - 增强日志系统，便于故障排查
+  - 提供详细的恢复机制说明文档
+
+### v1.1.0 (2025-01-29) - 智能收敛优化版
+- **智能收敛策略**：多维度收敛判断，避免无效循环
+- **进度显示优化**：实时Challenge进度条和收敛分析
+- **断点恢复机制**：材料级别的进度追踪
+- **统一日志系统**：结构化的分级日志
+
+### v1.0.0 - 初始版本
+- Alpha-Beta挑战式不变量发现系统
+- 3个核心AI代理架构
+- 动态配置支持
+- 基础API错误处理
 
 ## 许可证
 
